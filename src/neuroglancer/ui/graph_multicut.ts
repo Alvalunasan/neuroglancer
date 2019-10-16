@@ -51,6 +51,7 @@ import {RangeWidget} from 'neuroglancer/widget/range';
 import {StackView, Tab} from 'neuroglancer/widget/tab_view';
 import {makeTextIconButton} from 'neuroglancer/widget/text_icon_button';
 import {TimeSegmentWidget} from 'neuroglancer/widget/time_segment_widget';
+import {Uint64EntryWidget} from '../widget/uint64_entry_widget';
 
 type GraphOperationMarkerId = {
   id: string,
@@ -286,6 +287,7 @@ export class GraphOperationLayerView extends Tab {
   multicutGroup = this.registerDisposer(new MinimizableGroupWidget('Multicut'));
   multicutOpacityGroup = this.registerDisposer(new MinimizableGroupWidget('Multicut Opacity'));
   timectrlGroup = this.registerDisposer(new MinimizableGroupWidget('Time Control'));
+  contactSitesGroup = this.registerDisposer(new MinimizableGroupWidget('Contact Sites'));
   timeWidget: TimeSegmentWidget|undefined;
 
   constructor(
@@ -439,6 +441,36 @@ export class GraphOperationLayerView extends Tab {
         });
       }
     }));
+
+    const addSegmentInput = this.registerDisposer(new Uint64EntryWidget());
+    let firstSegment: Uint64|undefined;
+    let secondSegment: Uint64|undefined;
+    const segmentInputDone = () => {
+      return firstSegment && secondSegment;
+    };
+    this.registerDisposer(addSegmentInput.valuesEntered.add((values) => {
+      for (let i = 0; i < values.length; i++) {
+        if (segmentInputDone()) {
+          break;
+        }
+        if (firstSegment) {
+          secondSegment = values[i];
+        } else {
+          firstSegment = values[i];
+        }
+      }
+    }));
+    this.contactSitesGroup.appendFixedChild(addSegmentInput.element);
+    const getContactSitesButton = document.createElement('button');
+    getContactSitesButton.addEventListener('click', () => {
+      this.wrapper.chunkedGraphLayer!
+          .getExactContactSitesForPair(firstSegment!, secondSegment!, displayState.timestamp.value)
+          .then((contactSites) => {
+        console.log(contactSites);
+      });
+    });
+    this.contactSitesGroup.appendFixedChild(getContactSitesButton);
+    this.element.appendChild(this.contactSitesGroup.element);
   }
 
   private updateSelectionView() {
