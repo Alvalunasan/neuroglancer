@@ -23,7 +23,7 @@ import './annotations.css';
 import './graph.css';
 
 import debounce from 'lodash/debounce';
-import {Annotation, AnnotationReference, AnnotationType, getAnnotationTypeHandler} from 'neuroglancer/annotation';
+import {Annotation, AnnotationReference, AnnotationType, getAnnotationTypeHandler, Point} from 'neuroglancer/annotation';
 import {GraphOperationLayerState} from 'neuroglancer/graph/graph_operation_layer_state';
 import {MouseSelectionState} from 'neuroglancer/layer';
 import {VoxelSize} from 'neuroglancer/navigation_state';
@@ -287,7 +287,10 @@ export class GraphOperationLayerView extends Tab {
   multicutGroup = this.registerDisposer(new MinimizableGroupWidget('Multicut'));
   multicutOpacityGroup = this.registerDisposer(new MinimizableGroupWidget('Multicut Opacity'));
   timectrlGroup = this.registerDisposer(new MinimizableGroupWidget('Time Control'));
-  contactSitesGroup = this.registerDisposer(new MinimizableGroupWidget('Contact Sites'));
+  contactSitesPairwiseGroup =
+      this.registerDisposer(new MinimizableGroupWidget('Contact Sites (for pair)'));
+  contactSitesSingleRootGroup =
+      this.registerDisposer(new MinimizableGroupWidget('Contact Sites (for single root)'));
   timeWidget: TimeSegmentWidget|undefined;
 
   constructor(
@@ -442,35 +445,134 @@ export class GraphOperationLayerView extends Tab {
       }
     }));
 
+    const addSegmentLabel = document.createElement('span');
+    addSegmentLabel.textContent = 'Enter segment IDs: ';
+    // this.contactSitesPairwiseGroup.appendFixedChild(addSegmentLabel);
     const addSegmentInput = this.registerDisposer(new Uint64EntryWidget());
-    let firstSegment: Uint64|undefined;
-    let secondSegment: Uint64|undefined;
+    addSegmentInput.element.style.display = 'inline-block';
+    // addSegmentInput.element.style.width = '30%';
+    let firstSegment: Uint64|null = null;
+    let secondSegment: Uint64|null = null;
     const segmentInputDone = () => {
       return firstSegment && secondSegment;
     };
+    const firstSegmentDisplay = document.createElement('div');
+    // firstSegmentDisplay.style.display = 'none';
+    const firstSegmentLabel = document.createElement('label');
+    firstSegmentLabel.className = 'neuroglancer-select-text';
+    firstSegmentLabel.textContent = 'Segment 1: Not selected';
+    const removeFirstSegmentButton = document.createElement('button');
+    removeFirstSegmentButton.textContent = 'x';
+    removeFirstSegmentButton.addEventListener('click', () => {
+      firstSegment = null;
+      firstSegmentLabel.textContent = 'Segment 1: Not selected';
+      removeFirstSegmentButton.style.display = 'none';
+      // firstSegmentDisplay.style.display = 'none';
+    });
+    removeFirstSegmentButton.style.display = 'none';
+    firstSegmentDisplay.appendChild(firstSegmentLabel);
+    firstSegmentDisplay.appendChild(removeFirstSegmentButton);
+    const secondSegmentDisplay = document.createElement('div');
+    // secondSegmentDisplay.style.display = 'none';
+    const secondSegmentLabel = document.createElement('label');
+    secondSegmentLabel.className = 'neuroglancer-select-text';
+    secondSegmentLabel.textContent = 'Segment 2: Not selected';
+    const removeSecondSegmentButton = document.createElement('button');
+    removeSecondSegmentButton.textContent = 'x';
+    removeSecondSegmentButton.addEventListener('click', () => {
+      secondSegment = null;
+      secondSegmentLabel.textContent = 'Segment 2: Not selected';
+      removeSecondSegmentButton.style.display = 'none';
+      // secondSegmentDisplay.style.display = 'none';
+    });
+    removeSecondSegmentButton.style.display = 'none';
+    secondSegmentDisplay.appendChild(secondSegmentLabel);
+    secondSegmentDisplay.appendChild(removeSecondSegmentButton);
     this.registerDisposer(addSegmentInput.valuesEntered.add((values) => {
       for (let i = 0; i < values.length; i++) {
         if (segmentInputDone()) {
+          StatusMessage.showTemporaryMessage('Two segments already selected.', 3000);
           break;
         }
         if (firstSegment) {
           secondSegment = values[i];
+          secondSegmentLabel.textContent = `Segment 2: ${secondSegment.toString()}`;
+          removeSecondSegmentButton.style.display = '';
+          // secondSegmentDisplay.style.display = '';
         } else {
           firstSegment = values[i];
+          firstSegmentLabel.textContent = `Segment 1: ${firstSegment.toString()}`;
+          removeFirstSegmentButton.style.display = '';
+          // firstSegmentDisplay.style.display = '';
         }
       }
     }));
-    this.contactSitesGroup.appendFixedChild(addSegmentInput.element);
+    const addSegmentElement = document.createElement('div');
+    addSegmentElement.appendChild(addSegmentLabel);
+    addSegmentElement.appendChild(addSegmentInput.element);
     const getContactSitesButton = document.createElement('button');
+    getContactSitesButton.textContent = 'Get contact sites';
+    // getContactSitesButton.style.display = 'inline-block';
+    // getContactSitesButton.textContent = 'G';
     getContactSitesButton.addEventListener('click', () => {
-      this.wrapper.chunkedGraphLayer!
-          .getExactContactSitesForPair(firstSegment!, secondSegment!, displayState.timestamp.value)
-          .then((contactSites) => {
-        console.log(contactSites);
-      });
+      // if (firstSegment === null || secondSegment === null) {
+      //   StatusMessage.showTemporaryMessage('You must enter two segment IDs first.', 5000);
+      // } else if (Uint64.equal(firstSegment, secondSegment)) {
+      //   StatusMessage.showTemporaryMessage('The two segments must not be equal', 5000);
+      // } else {
+      //   const firstSegmentClone = firstSegment.clone();
+      //   const secondSegmentClone = secondSegment.clone();
+      //   this.wrapper.chunkedGraphLayer!
+      //       .getContactSitesForPair(firstSegment, secondSegment, displayState.timestamp.value)
+      //       .then((contactSites) => {
+      //         if (contactSites.length === 0) {
+      //           StatusMessage.showTemporaryMessage(`${firstSegmentClone.toString()} and ${
+      //               secondSegmentClone.toString()} do not have any contact sites`);
+      //         } else {
+      //           StatusMessage.showTemporaryMessage(
+      //               `Contact sites between ${firstSegmentClone.toString()} and ${
+      //                   secondSegmentClone.toString()} retrieved!`,
+      //               5000);
+      //         }
+      //         const testMin = new MinimizableGroupWidget(`${firstSegmentClone.toString()} &
+      //         ${secondSegmentClone.toString()}`); testMin.element.style.marginLeft = '10%';
+      //         contactSites.forEach(contactSite => {
+      //           const contactSitePoint: Point = {
+      //             id: '',
+      //             segments: [firstSegmentClone, secondSegmentClone],
+      //             description: `Area = ${contactSite.area.toString()}`,
+      //             point: contactSite.coordinate,
+      //             type: AnnotationType.POINT
+      //           };
+      //           this.wrapper.contactPointsAnnotationSource.add(contactSitePoint);
+      //         });
+      //         this.contactSitesPairwiseGroup.appendFlexibleChild(testMin.element);
+      //       });
+      // }
+      const firstSegmentClone = firstSegment!.clone();
+      const secondSegmentClone = secondSegment!.clone();
+      const testMin = new MinimizableGroupWidget('Contact Site Pair #2');
+      testMin.element.style.marginLeft = '10%';
+      this.contactSitesPairwiseGroup.appendFlexibleChild(testMin.element);
     });
-    this.contactSitesGroup.appendFixedChild(getContactSitesButton);
-    this.element.appendChild(this.contactSitesGroup.element);
+    // addSegmentElement.appendChild(getContactSitesButton);
+    // testSpan.appendChild(getContactSitesButton);
+    this.contactSitesPairwiseGroup.appendFixedChild(addSegmentElement);
+    this.contactSitesPairwiseGroup.appendFixedChild(firstSegmentDisplay);
+    this.contactSitesPairwiseGroup.appendFixedChild(secondSegmentDisplay);
+    // this.contactSitesPairwiseGroup.appendFixedChild(locationModeDropdown);
+    // this.contactSitesPairwiseGroup.appendFixedChild(getContactSitesButton);
+    this.contactSitesPairwiseGroup.appendFixedChild(getContactSitesButton);
+    // const testMin = new MinimizableGroupWidget('Inner MG');
+    // for (let i = 0; i < 80; i++) {
+    //   const testDiv = document.createElement('div');
+    //   testDiv.textContent = 'Hi';
+    //   testMin.appendFixedChild(testDiv);
+    // }
+    // testMin.element.style.marginLeft = '20%';
+    // this.contactSitesPairwiseGroup.appendFlexibleChild(testMin.element);
+    this.element.appendChild(this.contactSitesPairwiseGroup.element);
+    this.element.appendChild(this.contactSitesSingleRootGroup.element);
   }
 
   private updateSelectionView() {

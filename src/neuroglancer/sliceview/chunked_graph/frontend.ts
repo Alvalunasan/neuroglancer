@@ -61,12 +61,8 @@ export class ChunkedGraphChunkSource extends SliceViewChunkSource implements
   }
 }
 
-type ExactLocationContactSite = {
+type ContactSite = {
   coordinate: vec3; area: number;
-};
-
-type BoundedLocationContactSite = {
-  lowerBoundCoordinate: vec3; upperBoundCoordinate: vec3; area: number;
 };
 
 // type BoundedContactSiteWithSegment = {

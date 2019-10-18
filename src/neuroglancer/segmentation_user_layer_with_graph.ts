@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import {AnnotationLayer, SliceViewAnnotationLayer} from 'neuroglancer/annotation/frontend';
+import {AnnotationLayer, SliceViewAnnotationLayer, AnnotationLayerState} from 'neuroglancer/annotation/frontend';
 import {PerspectiveViewAnnotationLayer} from 'neuroglancer/annotation/renderlayer';
 import {setAnnotationHoverStateFromMouseState} from 'neuroglancer/annotation/selection';
 import {GraphOperationLayerState} from 'neuroglancer/graph/graph_operation_layer_state';
@@ -37,6 +37,8 @@ import {vec3} from 'neuroglancer/util/geom';
 import {parseArray, verifyObjectProperty} from 'neuroglancer/util/json';
 import {Uint64} from 'neuroglancer/util/uint64';
 import {NullarySignal} from './util/signal';
+import { LocalAnnotationSource } from './annotation';
+import { VoxelSize } from './navigation_state';
 
 // Already defined in segmentation_user_layer.ts
 const EQUIVALENCES_JSON_KEY = 'equivalences';
@@ -87,6 +89,7 @@ function helper<TBase extends BaseConstructor>(Base: TBase) {
         new SelectedGraphOperationState(this.graphOperationLayerState.addRef()));
     displayState: SegmentationUserLayerWithGraphDisplayState;
     private multiscaleVolumeChunkSource: MultiscaleVolumeChunkSource|undefined;
+    contactPointsAnnotationSource: LocalAnnotationSource;
     constructor(...args: any[]) {
       super(...args);
       this.displayState = {
@@ -140,6 +143,25 @@ function helper<TBase extends BaseConstructor>(Base: TBase) {
         setAnnotationHoverStateFromMouseState(stateB, this.manager.layerSelectedValues.mouseState);
         this.addRenderLayer(new SliceViewAnnotationLayer(annotationLayer));
         this.addRenderLayer(new PerspectiveViewAnnotationLayer(annotationLayer.addRef()));
+      }
+
+      {
+        // this.manager.voxelSize
+        const contactPointsAnnotationSource = this.contactPointsAnnotationSource = new LocalAnnotationSource();
+        const contactPointsAnnotationLayerState = new AnnotationLayerState({
+          transform: this.transform,
+          source: contactPointsAnnotationSource,
+          fillOpacity: trackableAlphaValue(1.0),
+          color: new TrackableRGB(vec3.fromValues(1.0, 1.0, 0.0))
+        });
+        const contactPointsAnnotationLayer = new AnnotationLayer(
+            this.manager.chunkManager, contactPointsAnnotationLayerState);
+        setAnnotationHoverStateFromMouseState(
+            contactPointsAnnotationLayerState,
+            this.manager.layerSelectedValues.mouseState);
+        this.addRenderLayer(new SliceViewAnnotationLayer(contactPointsAnnotationLayer));
+        this.addRenderLayer(new PerspectiveViewAnnotationLayer(contactPointsAnnotationLayer.addRef()));
+        // this.registerDisposer(this.pathFinderState.changed.add(this.specificationChanged.dispatch));
       }
 
       this.tabs.default = 'rendering';
@@ -516,6 +538,7 @@ export interface SegmentationUserLayerWithGraph extends SegmentationUserLayer {
     isActive: TrackableBoolean,
     performingMulticut: TrackableBoolean
   }) => SupervoxelRenderLayer;
+  contactPointsAnnotationSource: LocalAnnotationSource;
 }
 
 /**
