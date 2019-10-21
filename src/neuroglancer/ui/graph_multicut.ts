@@ -46,8 +46,8 @@ import {formatIntegerPoint} from 'neuroglancer/util/spatial_units';
 import {Uint64} from 'neuroglancer/util/uint64';
 import {WatchableVisibilityPriority} from 'neuroglancer/visibility_priority/frontend';
 import {makeCloseButton} from 'neuroglancer/widget/close_button';
-import {MinimizableGroupWidget} from 'neuroglancer/widget/minimizable_group';
 import {RangeWidget} from 'neuroglancer/widget/range';
+import {MinimizableGroupWidget, MinimizableGroupWidgetWithHeader} from 'neuroglancer/widget/minimizable_group';
 import {StackView, Tab} from 'neuroglancer/widget/tab_view';
 import {makeTextIconButton} from 'neuroglancer/widget/text_icon_button';
 import {TimeSegmentWidget} from 'neuroglancer/widget/time_segment_widget';
@@ -451,6 +451,9 @@ export class GraphOperationLayerView extends Tab {
     const addSegmentInput = this.registerDisposer(new Uint64EntryWidget());
     addSegmentInput.element.style.display = 'inline-block';
     // addSegmentInput.element.style.width = '30%';
+    const addSegmentElement = document.createElement('div');
+    addSegmentElement.appendChild(addSegmentLabel);
+    addSegmentElement.appendChild(addSegmentInput.element);
     let firstSegment: Uint64|null = null;
     let secondSegment: Uint64|null = null;
     const segmentInputDone = () => {
@@ -507,13 +510,16 @@ export class GraphOperationLayerView extends Tab {
         }
       }
     }));
-    const addSegmentElement = document.createElement('div');
-    addSegmentElement.appendChild(addSegmentLabel);
-    addSegmentElement.appendChild(addSegmentInput.element);
+    const contactSiteNameInputLabel = document.createElement('label');
+    contactSiteNameInputLabel.textContent = 'Alias for contact sites: ';
+    const contactSiteNameInput = document.createElement('input');
+    contactSiteNameInputLabel.appendChild(contactSiteNameInput);
+    contactSiteNameInput.placeholder = 'Contact Sites for Pair #1';
     const getContactSitesButton = document.createElement('button');
     getContactSitesButton.textContent = 'Get contact sites';
     // getContactSitesButton.style.display = 'inline-block';
     // getContactSitesButton.textContent = 'G';
+    let numberOfContactSitesPairs = 0;
     getContactSitesButton.addEventListener('click', () => {
       // if (firstSegment === null || secondSegment === null) {
       //   StatusMessage.showTemporaryMessage('You must enter two segment IDs first.', 5000);
@@ -551,8 +557,26 @@ export class GraphOperationLayerView extends Tab {
       // }
       const firstSegmentClone = firstSegment!.clone();
       const secondSegmentClone = secondSegment!.clone();
-      const testMin = new MinimizableGroupWidget('Contact Site Pair #2');
-      testMin.element.style.marginLeft = '10%';
+      // const testMin = new MinimizableGroupWidget('Contact Site Pair #2');
+      const button1Test = document.createElement('button');
+      button1Test.textContent = 'B1';
+      const button2Test = document.createElement('button');
+      button2Test.textContent = 'B2';
+      numberOfContactSitesPairs++;
+      const contactSitesForPairTitle = (contactSiteNameInput.value) ?
+          contactSiteNameInput.value :
+          `Contact Sites for Pair #${numberOfContactSitesPairs}`;
+      contactSiteNameInput.value = '';
+      contactSiteNameInput.placeholder = `Contact Sites for Pair #${numberOfContactSitesPairs+1}`;
+      secondSegment = null;
+      secondSegmentLabel.textContent = 'Segment 2: Not selected';
+      removeSecondSegmentButton.style.display = 'none';
+      firstSegment = null;
+      firstSegmentLabel.textContent = 'Segment 1: Not selected';
+      removeFirstSegmentButton.style.display = 'none';
+      const testMin =
+          new MinimizableGroupWidgetWithHeader(contactSitesForPairTitle, [button1Test, button2Test]);
+      testMin.element.style.marginLeft = '6%';
       this.contactSitesPairwiseGroup.appendFlexibleChild(testMin.element);
     });
     // addSegmentElement.appendChild(getContactSitesButton);
@@ -560,6 +584,7 @@ export class GraphOperationLayerView extends Tab {
     this.contactSitesPairwiseGroup.appendFixedChild(addSegmentElement);
     this.contactSitesPairwiseGroup.appendFixedChild(firstSegmentDisplay);
     this.contactSitesPairwiseGroup.appendFixedChild(secondSegmentDisplay);
+    this.contactSitesPairwiseGroup.appendFixedChild(contactSiteNameInputLabel);
     // this.contactSitesPairwiseGroup.appendFixedChild(locationModeDropdown);
     // this.contactSitesPairwiseGroup.appendFixedChild(getContactSitesButton);
     this.contactSitesPairwiseGroup.appendFixedChild(getContactSitesButton);
@@ -573,6 +598,10 @@ export class GraphOperationLayerView extends Tab {
     // this.contactSitesPairwiseGroup.appendFlexibleChild(testMin.element);
     this.element.appendChild(this.contactSitesPairwiseGroup.element);
     this.element.appendChild(this.contactSitesSingleRootGroup.element);
+  }
+
+  private addRandomPoints(groupWidget: MinimizableGroupWidgetWithHeader) {
+    
   }
 
   private updateSelectionView() {
