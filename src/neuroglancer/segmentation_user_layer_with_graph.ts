@@ -39,6 +39,7 @@ import {Uint64} from 'neuroglancer/util/uint64';
 import {NullarySignal} from './util/signal';
 import { LocalAnnotationSource } from './annotation';
 import { VoxelSize } from './navigation_state';
+import { ContactSites } from './graph/contact_sites';
 
 // Already defined in segmentation_user_layer.ts
 const EQUIVALENCES_JSON_KEY = 'equivalences';
@@ -48,6 +49,7 @@ const EQUIVALENCES_JSON_KEY = 'equivalences';
 const ROOT_SEGMENTS_JSON_KEY = 'segments';
 const GRAPH_OPERATION_MARKER_JSON_KEY = 'graphOperationMarker';
 const TIMESTAMP_JSON_KEY = 'timestamp';
+const CONTACT_POINTS_JSON_KEY = 'contactPoints';
 
 const lastSegmentSelection: SegmentSelection = {
   segmentId: new Uint64(),
@@ -90,6 +92,7 @@ function helper<TBase extends BaseConstructor>(Base: TBase) {
     displayState: SegmentationUserLayerWithGraphDisplayState;
     private multiscaleVolumeChunkSource: MultiscaleVolumeChunkSource|undefined;
     contactPointsAnnotationSource: LocalAnnotationSource;
+    contactSites = this.registerDisposer(new ContactSites());
     constructor(...args: any[]) {
       super(...args);
       this.displayState = {
@@ -247,6 +250,9 @@ function helper<TBase extends BaseConstructor>(Base: TBase) {
       if (this.displayState.timestamp && specification[TIMESTAMP_JSON_KEY]) {
         this.displayState.timestamp.value = (specification[TIMESTAMP_JSON_KEY]);
       }
+      if (specification[CONTACT_POINTS_JSON_KEY]) {
+        this.contactSites.restoreState(specification[CONTACT_POINTS_JSON_KEY]);
+      }
     }
 
     toJSON() {
@@ -259,6 +265,7 @@ function helper<TBase extends BaseConstructor>(Base: TBase) {
       if (this.graphOperationLayerState.value) {
         x[GRAPH_OPERATION_MARKER_JSON_KEY] = this.graphOperationLayerState.value.toJSON();
       }
+      x[CONTACT_POINTS_JSON_KEY] = this.contactSites.toJSON();
 
       // Graph equivalences can contain million of supervoxel IDs - don't store them in the state.
       delete x[EQUIVALENCES_JSON_KEY];

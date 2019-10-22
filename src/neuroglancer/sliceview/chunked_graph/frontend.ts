@@ -26,6 +26,7 @@ import {Uint64Set} from 'neuroglancer/uint64_set';
 import {vec3} from 'neuroglancer/util/geom';
 import {Uint64} from 'neuroglancer/util/uint64';
 import {RPC} from 'neuroglancer/worker_rpc';
+import { ContactSite } from 'src/neuroglancer/graph/contact_sites';
 
 export const GRAPH_SERVER_NOT_SPECIFIED = Symbol('Graph Server Not Specified.');
 
@@ -61,9 +62,6 @@ export class ChunkedGraphChunkSource extends SliceViewChunkSource implements
   }
 }
 
-type ContactSite = {
-  coordinate: vec3; area: number;
-};
 
 // type BoundedContactSiteWithSegment = {
 //   lowerBoundCoordinate: vec3; upperBoundCoordinate: vec3; area: number; segment: Uint64;

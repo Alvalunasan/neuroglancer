@@ -23,7 +23,7 @@ import './annotations.css';
 import './graph.css';
 
 import debounce from 'lodash/debounce';
-import {Annotation, AnnotationReference, AnnotationType, getAnnotationTypeHandler, Point} from 'neuroglancer/annotation';
+import {Annotation, AnnotationReference, AnnotationType, getAnnotationTypeHandler, LocalAnnotationSource, Point} from 'neuroglancer/annotation';
 import {GraphOperationLayerState} from 'neuroglancer/graph/graph_operation_layer_state';
 import {MouseSelectionState} from 'neuroglancer/layer';
 import {VoxelSize} from 'neuroglancer/navigation_state';
@@ -38,7 +38,7 @@ import {Tool} from 'neuroglancer/ui/tool';
 import {Uint64Set} from 'neuroglancer/uint64_set';
 import {TrackableRGB} from 'neuroglancer/util/color';
 import {Borrowed, Owned, RefCounted} from 'neuroglancer/util/disposable';
-import {removeChildren} from 'neuroglancer/util/dom';
+import {removeChildren, removeFromParent} from 'neuroglancer/util/dom';
 import {mat4, vec3} from 'neuroglancer/util/geom';
 import {verifyObjectProperty, verifyOptionalString, verifyString} from 'neuroglancer/util/json';
 import {NullarySignal} from 'neuroglancer/util/signal';
@@ -51,6 +51,11 @@ import {MinimizableGroupWidget, MinimizableGroupWidgetWithHeader} from 'neurogla
 import {StackView, Tab} from 'neuroglancer/widget/tab_view';
 import {makeTextIconButton} from 'neuroglancer/widget/text_icon_button';
 import {TimeSegmentWidget} from 'neuroglancer/widget/time_segment_widget';
+
+import {setAnnotationHoverStateFromMouseState} from '../annotation/selection';
+import {SpontaneousAnnotationLayer} from '../annotation/spontaneous_annotation_layer';
+import {TrackableRGB} from '../util/color';
+import {ColorWidget} from '../widget/color';
 import {Uint64EntryWidget} from '../widget/uint64_entry_widget';
 
 type GraphOperationMarkerId = {
@@ -560,24 +565,66 @@ export class GraphOperationLayerView extends Tab {
       // const testMin = new MinimizableGroupWidget('Contact Site Pair #2');
       const button1Test = document.createElement('button');
       button1Test.textContent = 'B1';
-      const button2Test = document.createElement('button');
-      button2Test.textContent = 'B2';
+      // button1Test.style.paddingBottom = '0px';
+      button1Test.style.verticalAlign = 'bottom';
+      // button1Test.style.marginBottom = '0px';
+      const deleteGroupButton = document.createElement('button');
+      deleteGroupButton.textContent = 'x';
+      deleteGroupButton.style.verticalAlign = 'bottom';
       numberOfContactSitesPairs++;
       const contactSitesForPairTitle = (contactSiteNameInput.value) ?
           contactSiteNameInput.value :
           `Contact Sites for Pair #${numberOfContactSitesPairs}`;
       contactSiteNameInput.value = '';
-      contactSiteNameInput.placeholder = `Contact Sites for Pair #${numberOfContactSitesPairs+1}`;
+      contactSiteNameInput.placeholder = `Contact Sites for Pair #${numberOfContactSitesPairs + 1}`;
       secondSegment = null;
       secondSegmentLabel.textContent = 'Segment 2: Not selected';
       removeSecondSegmentButton.style.display = 'none';
       firstSegment = null;
       firstSegmentLabel.textContent = 'Segment 1: Not selected';
       removeFirstSegmentButton.style.display = 'none';
-      const testMin =
-          new MinimizableGroupWidgetWithHeader(contactSitesForPairTitle, [button1Test, button2Test]);
-      testMin.element.style.marginLeft = '6%';
-      this.contactSitesPairwiseGroup.appendFlexibleChild(testMin.element);
+      const annotationColor =
+          new TrackableRGB(vec3.fromValues(Math.random(), Math.random(), Math.random()));
+      const annotationLayerForContactSitesPair = new SpontaneousAnnotationLayer(
+          this.wrapper.manager.chunkManager, this.wrapper.transform, annotationColor);
+      const colorWidget =
+          annotationLayerForContactSitesPair.registerDisposer(new ColorWidget(annotationColor));
+      setAnnotationHoverStateFromMouseState(
+          annotationLayerForContactSitesPair.annotationLayerState,
+          this.wrapper.manager.layerSelectedValues.mouseState);
+      annotationLayerForContactSitesPair.renderLayers.forEach(renderLayer => {
+        this.wrapper.addRenderLayer(renderLayer);
+      });
+      colorWidget.element.style.height = '1.3em';
+      colorWidget.element.style.width = '1.5em';
+      // colorWidget.element.style.paddingBottom = '0.2em';
+      colorWidget.element.style.top = '-10%';
+      const minimizableGroupForContactSitesPair = new MinimizableGroupWidgetWithHeader(
+          contactSitesForPairTitle, [button1Test, colorWidget.element, deleteGroupButton]);
+      minimizableGroupForContactSitesPair.element.style.marginLeft = '6%';
+      deleteGroupButton.addEventListener('click', () => {
+        const deleteConfirmed = confirm(
+            `Are you sure you want to delete contact sites group ${contactSitesForPairTitle}?`);
+        if (deleteConfirmed) {
+          annotationLayerForContactSitesPair.renderLayers.forEach(renderLayer => {
+            this.wrapper.removeRenderLayer(renderLayer);
+          });
+          annotationLayerForContactSitesPair.dispose();
+          numberOfContactSitesPairs--;
+          removeFromParent(minimizableGroupForContactSitesPair.element);
+        }
+      });
+      const elementsList = this.addRandomPoints(
+          minimizableGroupForContactSitesPair, annotationLayerForContactSitesPair,
+          firstSegmentClone, secondSegmentClone);
+      annotationLayerForContactSitesPair.registerDisposer(colorWidget.model.changed.add(() => {
+        elementsList.forEach(element => {
+          const positionElement = element.querySelector('.neuroglancer-multicut-voxel-coordinates-link');
+          (<HTMLElement>positionElement!).style.color = colorWidget.model.toString();
+        });
+      }));
+      this.contactSitesPairwiseGroup.appendFlexibleChild(
+          minimizableGroupForContactSitesPair.element);
     });
     // addSegmentElement.appendChild(getContactSitesButton);
     // testSpan.appendChild(getContactSitesButton);
@@ -600,8 +647,50 @@ export class GraphOperationLayerView extends Tab {
     this.element.appendChild(this.contactSitesSingleRootGroup.element);
   }
 
-  private addRandomPoints(groupWidget: MinimizableGroupWidgetWithHeader) {
-    
+  // groupWidget: MinimizableGroupWidgetWithHeader,
+  private addRandomPoints(
+      minimizableGroupForContactSitesPair: MinimizableGroupWidgetWithHeader,
+      annotationLayerForContactSitesPair: SpontaneousAnnotationLayer, firstSegment: Uint64,
+      secondSegment: Uint64): HTMLElement[] {
+    const annotationList = document.createElement('ul');
+    const elementsList: HTMLElement[] = [];
+    for (let i = 0; i < 10; i++) {
+      let randomNum1 = Math.random() * 1000;
+      let randomNum2 = Math.random() * 1000;
+      let randomNum3 = Math.random() * 1000;
+      const contactSitePoint: Point = {
+        id: '',
+        segments: [firstSegment, secondSegment],
+        description: `Area = ${randomNum1}`,
+        point: vec3.fromValues(
+            (169000 + randomNum1) * 4, (67500 + randomNum2) * 4, (4200 + randomNum3) * 40),
+        type: AnnotationType.POINT
+      };
+      annotationLayerForContactSitesPair.source.add(contactSitePoint);
+      const element = this.makeAnnotationListElement(
+          contactSitePoint, annotationLayerForContactSitesPair.transform.transform,
+          annotationLayerForContactSitesPair.color.toString(), false);
+      element.addEventListener('mouseenter', () => {
+        this.annotationLayer.hoverState.value = {id: contactSitePoint.id};
+      });
+      element.addEventListener('click', () => {
+        this.state.value = {id: contactSitePoint.id};
+      });
+      element.addEventListener('mouseup', (event: MouseEvent) => {
+        if (event.button === 2) {
+          this.setSpatialCoordinates(
+              getCenterPosition(contactSitePoint, this.annotationLayer.objectToGlobal));
+        }
+      });
+      const description = document.createElement('div');
+      description.className = 'neuroglancer-annotation-description';
+      description.textContent = `Area = ${randomNum1}`;
+      element.appendChild(description);
+      annotationList.appendChild(element);
+      elementsList.push(element);
+    }
+    minimizableGroupForContactSitesPair.appendFixedChild(annotationList);
+    return elementsList;
   }
 
   private updateSelectionView() {
@@ -669,7 +758,7 @@ export class GraphOperationLayerView extends Tab {
     const {objectToGlobal} = annotationLayer;
     const annotationListElementCreator = (annotation: Annotation, color: string) => {
       if (annotation.segments && annotation.segments.length >= 2) {
-        const element = this.makeAnnotationListElement(annotation, objectToGlobal, color);
+        const element = this.makeAnnotationListElement(annotation, objectToGlobal, color, true);
         annotationListContainer.appendChild(element);
         annotationListElements.set(annotation.id, element);
         element.addEventListener('mouseenter', () => {
@@ -699,7 +788,8 @@ export class GraphOperationLayerView extends Tab {
     this.updateSelectionView();
   }
 
-  private makeAnnotationListElement(annotation: Annotation, transform: mat4, color: string) {
+  private makeAnnotationListElement(
+      annotation: Annotation, transform: mat4, color: string, multicutElement: boolean) {
     const element = document.createElement('li');
     element.title = 'Click to select, right click to recenter view.';
 
@@ -712,7 +802,8 @@ export class GraphOperationLayerView extends Tab {
     position.className = 'neuroglancer-annotation-position';
     if (annotation.segments && annotation.segments.length >= 2) {
       this.makePositionElement(
-          position, annotation, transform, this.voxelSize, this.setSpatialCoordinates, color);
+          position, annotation, transform, this.voxelSize, this.setSpatialCoordinates, color,
+          multicutElement);
     } else {
       // Should never happen
       throw Error('Graph multicut point not associated with both a supervoxel and a root segment');
@@ -724,17 +815,10 @@ export class GraphOperationLayerView extends Tab {
 
   private makePositionElement(
       position: HTMLElement, annotation: Annotation, transform: mat4, voxelSize: VoxelSize,
-      setSpatialCoordinates: (point: vec3) => void, color: string) {
+      setSpatialCoordinates: (point: vec3) => void, color: string, multicutElement: boolean) {
     if (annotation.type === AnnotationType.POINT) {
-      const swapActiveSets = () => {
-        const tempActive = this.annotationLayer.annotationToSupervoxelA.isActive.value;
-        this.annotationLayer.annotationToSupervoxelA.isActive.value =
-            this.annotationLayer.annotationToSupervoxelB.isActive.value;
-        this.annotationLayer.annotationToSupervoxelB.isActive.value = tempActive;
-      };
       const spatialPoint = vec3.transformMat4(vec3.create(), annotation.point, transform);
       const positionText = formatIntegerPoint(voxelSize.voxelFromSpatial(tempVec3, spatialPoint));
-      let swapBack = false;
       const element = document.createElement('span');
       element.className = 'neuroglancer-multicut-voxel-coordinates-link';
       element.textContent = positionText;
@@ -744,23 +828,32 @@ export class GraphOperationLayerView extends Tab {
       element.addEventListener('click', () => {
         setSpatialCoordinates(spatialPoint);
       });
-      element.addEventListener('mouseenter', () => {
-        if ((this.annotationLayer.annotationToSupervoxelA.isActive.value &&
-             color === sourceBListColor) ||
-            (this.annotationLayer.annotationToSupervoxelB.isActive.value &&
-             color === sourceAListColor)) {
-          swapActiveSets();
-          swapBack = true;
-        }
-        this.wrapper.displayState.segmentSelectionState.setRaw(annotation.segments![0]);
-      });
-      element.addEventListener('mouseleave', () => {
-        if (swapBack) {
-          swapActiveSets();
-          swapBack = false;
-        }
-        this.wrapper.displayState.segmentSelectionState.setRaw(null);
-      });
+      if (multicutElement) {
+        let swapBack = false;
+        const swapActiveSets = () => {
+          const tempActive = this.annotationLayer.annotationToSupervoxelA.isActive.value;
+          this.annotationLayer.annotationToSupervoxelA.isActive.value =
+              this.annotationLayer.annotationToSupervoxelB.isActive.value;
+          this.annotationLayer.annotationToSupervoxelB.isActive.value = tempActive;
+        };
+        element.addEventListener('mouseenter', () => {
+          if ((this.annotationLayer.annotationToSupervoxelA.isActive.value &&
+               color === sourceBListColor) ||
+              (this.annotationLayer.annotationToSupervoxelB.isActive.value &&
+               color === sourceAListColor)) {
+            swapActiveSets();
+            swapBack = true;
+          }
+          this.wrapper.displayState.segmentSelectionState.setRaw(annotation.segments![0]);
+        });
+        element.addEventListener('mouseleave', () => {
+          if (swapBack) {
+            swapActiveSets();
+            swapBack = false;
+          }
+          this.wrapper.displayState.segmentSelectionState.setRaw(null);
+        });
+      }
       position.appendChild(element);
     } else {
       // Should never happen
