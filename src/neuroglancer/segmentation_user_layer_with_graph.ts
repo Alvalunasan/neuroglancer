@@ -49,7 +49,7 @@ const EQUIVALENCES_JSON_KEY = 'equivalences';
 const ROOT_SEGMENTS_JSON_KEY = 'segments';
 const GRAPH_OPERATION_MARKER_JSON_KEY = 'graphOperationMarker';
 const TIMESTAMP_JSON_KEY = 'timestamp';
-const CONTACT_POINTS_JSON_KEY = 'contactPoints';
+const CONTACT_SITES_JSON_KEY = 'contactSites';
 
 const lastSegmentSelection: SegmentSelection = {
   segmentId: new Uint64(),
@@ -149,21 +149,22 @@ function helper<TBase extends BaseConstructor>(Base: TBase) {
       }
 
       {
+        this.registerDisposer(this.contactSites.changed.add(this.specificationChanged.dispatch));
         // this.manager.voxelSize
-        const contactPointsAnnotationSource = this.contactPointsAnnotationSource = new LocalAnnotationSource();
-        const contactPointsAnnotationLayerState = new AnnotationLayerState({
-          transform: this.transform,
-          source: contactPointsAnnotationSource,
-          fillOpacity: trackableAlphaValue(1.0),
-          color: new TrackableRGB(vec3.fromValues(1.0, 1.0, 0.0))
-        });
-        const contactPointsAnnotationLayer = new AnnotationLayer(
-            this.manager.chunkManager, contactPointsAnnotationLayerState);
-        setAnnotationHoverStateFromMouseState(
-            contactPointsAnnotationLayerState,
-            this.manager.layerSelectedValues.mouseState);
-        this.addRenderLayer(new SliceViewAnnotationLayer(contactPointsAnnotationLayer));
-        this.addRenderLayer(new PerspectiveViewAnnotationLayer(contactPointsAnnotationLayer.addRef()));
+        // const contactPointsAnnotationSource = this.contactPointsAnnotationSource = new LocalAnnotationSource();
+        // const contactPointsAnnotationLayerState = new AnnotationLayerState({
+        //   transform: this.transform,
+        //   source: contactPointsAnnotationSource,
+        //   fillOpacity: trackableAlphaValue(1.0),
+        //   color: new TrackableRGB(vec3.fromValues(1.0, 1.0, 0.0))
+        // });
+        // const contactPointsAnnotationLayer = new AnnotationLayer(
+        //     this.manager.chunkManager, contactPointsAnnotationLayerState);
+        // setAnnotationHoverStateFromMouseState(
+        //     contactPointsAnnotationLayerState,
+        //     this.manager.layerSelectedValues.mouseState);
+        // this.addRenderLayer(new SliceViewAnnotationLayer(contactPointsAnnotationLayer));
+        // this.addRenderLayer(new PerspectiveViewAnnotationLayer(contactPointsAnnotationLayer.addRef()));
         // this.registerDisposer(this.pathFinderState.changed.add(this.specificationChanged.dispatch));
       }
 
@@ -250,8 +251,8 @@ function helper<TBase extends BaseConstructor>(Base: TBase) {
       if (this.displayState.timestamp && specification[TIMESTAMP_JSON_KEY]) {
         this.displayState.timestamp.value = (specification[TIMESTAMP_JSON_KEY]);
       }
-      if (specification[CONTACT_POINTS_JSON_KEY]) {
-        this.contactSites.restoreState(specification[CONTACT_POINTS_JSON_KEY]);
+      if (specification[CONTACT_SITES_JSON_KEY]) {
+        this.contactSites.restoreState(specification[CONTACT_SITES_JSON_KEY]);
       }
     }
 
@@ -265,7 +266,7 @@ function helper<TBase extends BaseConstructor>(Base: TBase) {
       if (this.graphOperationLayerState.value) {
         x[GRAPH_OPERATION_MARKER_JSON_KEY] = this.graphOperationLayerState.value.toJSON();
       }
-      x[CONTACT_POINTS_JSON_KEY] = this.contactSites.toJSON();
+      x[CONTACT_SITES_JSON_KEY] = this.contactSites.toJSON();
 
       // Graph equivalences can contain million of supervoxel IDs - don't store them in the state.
       delete x[EQUIVALENCES_JSON_KEY];
@@ -546,6 +547,8 @@ export interface SegmentationUserLayerWithGraph extends SegmentationUserLayer {
     performingMulticut: TrackableBoolean
   }) => SupervoxelRenderLayer;
   contactPointsAnnotationSource: LocalAnnotationSource;
+  // contactPointsAnnotationSource: LocalAnnotationSource;
+  contactSites: ContactSites;
 }
 
 /**

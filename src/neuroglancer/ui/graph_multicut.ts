@@ -54,6 +54,8 @@ import {TimeSegmentWidget} from 'neuroglancer/widget/time_segment_widget';
 
 import {setAnnotationHoverStateFromMouseState} from '../annotation/selection';
 import {SpontaneousAnnotationLayer} from '../annotation/spontaneous_annotation_layer';
+import {PairwiseContactSites} from '../graph/contact_sites';
+import {TrackableBoolean, TrackableBooleanCheckbox} from '../trackable_boolean';
 import {TrackableRGB} from '../util/color';
 import {ColorWidget} from '../widget/color';
 import {Uint64EntryWidget} from '../widget/uint64_entry_widget';
@@ -526,81 +528,258 @@ export class GraphOperationLayerView extends Tab {
     // getContactSitesButton.textContent = 'G';
     let numberOfContactSitesPairs = 0;
     getContactSitesButton.addEventListener('click', () => {
-      // if (firstSegment === null || secondSegment === null) {
-      //   StatusMessage.showTemporaryMessage('You must enter two segment IDs first.', 5000);
-      // } else if (Uint64.equal(firstSegment, secondSegment)) {
-      //   StatusMessage.showTemporaryMessage('The two segments must not be equal', 5000);
-      // } else {
-      //   const firstSegmentClone = firstSegment.clone();
-      //   const secondSegmentClone = secondSegment.clone();
-      //   this.wrapper.chunkedGraphLayer!
-      //       .getContactSitesForPair(firstSegment, secondSegment, displayState.timestamp.value)
-      //       .then((contactSites) => {
-      //         if (contactSites.length === 0) {
-      //           StatusMessage.showTemporaryMessage(`${firstSegmentClone.toString()} and ${
-      //               secondSegmentClone.toString()} do not have any contact sites`);
-      //         } else {
-      //           StatusMessage.showTemporaryMessage(
-      //               `Contact sites between ${firstSegmentClone.toString()} and ${
-      //                   secondSegmentClone.toString()} retrieved!`,
-      //               5000);
-      //         }
-      //         const testMin = new MinimizableGroupWidget(`${firstSegmentClone.toString()} &
-      //         ${secondSegmentClone.toString()}`); testMin.element.style.marginLeft = '10%';
-      //         contactSites.forEach(contactSite => {
-      //           const contactSitePoint: Point = {
-      //             id: '',
-      //             segments: [firstSegmentClone, secondSegmentClone],
-      //             description: `Area = ${contactSite.area.toString()}`,
-      //             point: contactSite.coordinate,
-      //             type: AnnotationType.POINT
-      //           };
-      //           this.wrapper.contactPointsAnnotationSource.add(contactSitePoint);
-      //         });
-      //         this.contactSitesPairwiseGroup.appendFlexibleChild(testMin.element);
-      //       });
-      // }
-      const firstSegmentClone = firstSegment!.clone();
-      const secondSegmentClone = secondSegment!.clone();
+      if (firstSegment === null || secondSegment === null) {
+        StatusMessage.showTemporaryMessage('You must enter two segment IDs first.', 5000);
+      } else if (Uint64.equal(firstSegment, secondSegment)) {
+        StatusMessage.showTemporaryMessage('The two segments must not be equal', 5000);
+      } else {
+        const firstSegmentClone = firstSegment.clone();
+        const secondSegmentClone = secondSegment.clone();
+        this.wrapper.chunkedGraphLayer!
+            .getContactSitesForPair(firstSegment, secondSegment, displayState.timestamp.value)
+            .then((contactSites) => {
+              if (contactSites.length === 0) {
+                StatusMessage.showTemporaryMessage(`${firstSegmentClone.toString()} and ${
+                    secondSegmentClone.toString()} do not have any contact sites`);
+              } else {
+                StatusMessage.showTemporaryMessage(
+                    `Contact sites between ${firstSegmentClone.toString()} and ${
+                        secondSegmentClone.toString()} retrieved!`,
+                    5000);
+              }
+              // const testMin = new MinimizableGroupWidget(
+              //     `${firstSegmentClone.toString()} & ${secondSegmentClone.toString()}`);
+              // testMin.element.style.marginLeft = '10%';
+              // contactSites.forEach(contactSite => {
+              //   const contactSitePoint: Point = {
+              //     id: '',
+              //     segments: [firstSegmentClone, secondSegmentClone],
+              //     description: `Area = ${contactSite.area.toString()}`,
+              //     point: contactSite.coordinate,
+              //     type: AnnotationType.POINT
+              //   };
+              //   this.wrapper.contactPointsAnnotationSource.add(contactSitePoint);
+              // });
+              // this.contactSitesPairwiseGroup.appendFlexibleChild(testMin.element);
+
+              // const firstSegmentClone = firstSegment!.clone();
+              // const secondSegmentClone = secondSegment!.clone();
+              // const testMin = new MinimizableGroupWidget('Contact Site Pair #2');
+              const button1Test = document.createElement('button');
+              button1Test.textContent = 'B1';
+              // button1Test.style.paddingBottom = '0px';
+              button1Test.style.verticalAlign = 'bottom';
+              // button1Test.style.marginBottom = '0px';
+              const deleteGroupButton = document.createElement('button');
+              deleteGroupButton.textContent = 'x';
+              deleteGroupButton.style.verticalAlign = 'bottom';
+              numberOfContactSitesPairs++;
+              const contactSitesForPairTitle = (contactSiteNameInput.value) ?
+                  contactSiteNameInput.value :
+                  `Contact Sites for Pair #${numberOfContactSitesPairs}`;
+              contactSiteNameInput.value = '';
+              contactSiteNameInput.placeholder =
+                  `Contact Sites for Pair #${numberOfContactSitesPairs + 1}`;
+              secondSegment = null;
+              secondSegmentLabel.textContent = 'Segment 2: Not selected';
+              removeSecondSegmentButton.style.display = 'none';
+              firstSegment = null;
+              firstSegmentLabel.textContent = 'Segment 1: Not selected';
+              removeFirstSegmentButton.style.display = 'none';
+              const annotationColor = new TrackableRGB(vec3.fromValues(0.0, 0.0, 0.0));
+              annotationColor.value = vec3.fromValues(Math.random(), Math.random(), Math.random());
+              const annotationLayerForContactSitesPair = new SpontaneousAnnotationLayer(
+                  this.wrapper.manager.chunkManager, this.wrapper.transform, annotationColor);
+              const colorWidget = annotationLayerForContactSitesPair.registerDisposer(
+                  new ColorWidget(annotationColor));
+              setAnnotationHoverStateFromMouseState(
+                  annotationLayerForContactSitesPair.annotationLayerState,
+                  this.wrapper.manager.layerSelectedValues.mouseState);
+              annotationLayerForContactSitesPair.renderLayers.forEach(renderLayer => {
+                this.wrapper.addRenderLayer(renderLayer);
+              });
+              colorWidget.element.style.height = '1.3em';
+              colorWidget.element.style.width = '1.5em';
+              // colorWidget.element.style.paddingBottom = '0.2em';
+              colorWidget.element.style.top = '-10%';
+              const minimizableGroupForContactSitesPair = new MinimizableGroupWidgetWithHeader(
+                  contactSitesForPairTitle, [button1Test, colorWidget.element, deleteGroupButton]);
+              minimizableGroupForContactSitesPair.element.style.marginLeft = '6%';
+              deleteGroupButton.addEventListener('click', () => {
+                const deleteConfirmed =
+                    confirm(`Are you sure you want to delete contact sites group ${
+                        contactSitesForPairTitle}?`);
+                if (deleteConfirmed) {
+                  annotationLayerForContactSitesPair.renderLayers.forEach(renderLayer => {
+                    this.wrapper.removeRenderLayer(renderLayer);
+                  });
+                  annotationLayerForContactSitesPair.dispose();
+                  numberOfContactSitesPairs--;
+                  removeFromParent(minimizableGroupForContactSitesPair.element);
+                }
+              });
+              const pairwiseContactSiteGroup = new PairwiseContactSites(
+                  firstSegmentClone, secondSegmentClone, contactSites, colorWidget.model,
+                  contactSitesForPairTitle);
+              const elementsList = this.addPointsFromContactSites(
+                  pairwiseContactSiteGroup, minimizableGroupForContactSitesPair,
+                  annotationLayerForContactSitesPair, firstSegmentClone, secondSegmentClone);
+              annotationLayerForContactSitesPair.registerDisposer(
+                  colorWidget.model.changed.add(() => {
+                    elementsList.forEach(element => {
+                      const positionElement =
+                          element.querySelector('.neuroglancer-multicut-voxel-coordinates-link');
+                      (<HTMLElement>positionElement!).style.color = colorWidget.model.toString();
+                    });
+                  }));
+              this.wrapper.contactSites.addContactSiteGroup(pairwiseContactSiteGroup);
+              annotationLayerForContactSitesPair.registerDisposer(
+                  colorWidget.model.changed.add(() => {
+                    elementsList.forEach(element => {
+                      const positionElement =
+                          element.querySelector('.neuroglancer-multicut-voxel-coordinates-link');
+                      (<HTMLElement>positionElement!).style.color = colorWidget.model.toString();
+                    });
+                  }));
+              this.contactSitesPairwiseGroup.appendFlexibleChild(
+                  minimizableGroupForContactSitesPair.element);
+            });
+      }
+      // const firstSegmentClone = firstSegment!.clone();
+      // const secondSegmentClone = secondSegment!.clone();
+      // // const testMin = new MinimizableGroupWidget('Contact Site Pair #2');
+      // const button1Test = document.createElement('button');
+      // button1Test.textContent = 'B1';
+      // // button1Test.style.paddingBottom = '0px';
+      // button1Test.style.verticalAlign = 'bottom';
+      // // button1Test.style.marginBottom = '0px';
+      // const deleteGroupButton = document.createElement('button');
+      // deleteGroupButton.textContent = 'x';
+      // deleteGroupButton.style.verticalAlign = 'bottom';
+      // numberOfContactSitesPairs++;
+      // const contactSitesForPairTitle = (contactSiteNameInput.value) ?
+      //     contactSiteNameInput.value :
+      //     `Contact Sites for Pair #${numberOfContactSitesPairs}`;
+      // contactSiteNameInput.value = '';
+      // contactSiteNameInput.placeholder = `Contact Sites for Pair #${numberOfContactSitesPairs +
+      // 1}`; secondSegment = null; secondSegmentLabel.textContent = 'Segment 2: Not selected';
+      // removeSecondSegmentButton.style.display = 'none';
+      // firstSegment = null;
+      // firstSegmentLabel.textContent = 'Segment 1: Not selected';
+      // removeFirstSegmentButton.style.display = 'none';
+      // const annotationColor = new TrackableRGB(vec3.fromValues(0.0, 0.0, 0.0));
+      // annotationColor.value = vec3.fromValues(Math.random(), Math.random(), Math.random());
+      // const annotationLayerForContactSitesPair = new SpontaneousAnnotationLayer(
+      //     this.wrapper.manager.chunkManager, this.wrapper.transform, annotationColor);
+      // const colorWidget =
+      //     annotationLayerForContactSitesPair.registerDisposer(new ColorWidget(annotationColor));
+      // setAnnotationHoverStateFromMouseState(
+      //     annotationLayerForContactSitesPair.annotationLayerState,
+      //     this.wrapper.manager.layerSelectedValues.mouseState);
+      // annotationLayerForContactSitesPair.renderLayers.forEach(renderLayer => {
+      //   this.wrapper.addRenderLayer(renderLayer);
+      // });
+      // colorWidget.element.style.height = '1.3em';
+      // colorWidget.element.style.width = '1.5em';
+      // // colorWidget.element.style.paddingBottom = '0.2em';
+      // colorWidget.element.style.top = '-10%';
+      // const minimizableGroupForContactSitesPair = new MinimizableGroupWidgetWithHeader(
+      //     contactSitesForPairTitle, [button1Test, colorWidget.element, deleteGroupButton]);
+      // minimizableGroupForContactSitesPair.element.style.marginLeft = '6%';
+      // deleteGroupButton.addEventListener('click', () => {
+      //   const deleteConfirmed = confirm(
+      //       `Are you sure you want to delete contact sites group ${contactSitesForPairTitle}?`);
+      //   if (deleteConfirmed) {
+      //     annotationLayerForContactSitesPair.renderLayers.forEach(renderLayer => {
+      //       this.wrapper.removeRenderLayer(renderLayer);
+      //     });
+      //     annotationLayerForContactSitesPair.dispose();
+      //     numberOfContactSitesPairs--;
+      //     removeFromParent(minimizableGroupForContactSitesPair.element);
+      //   }
+      // });
+      // const pairwiseContactSiteGroup = new PairwiseContactSites(
+      //     firstSegmentClone, secondSegmentClone, [], colorWidget.model,
+      //     contactSitesForPairTitle);
+      // const elementsList = this.addRandomPoints(
+      //     pairwiseContactSiteGroup, minimizableGroupForContactSitesPair,
+      //     annotationLayerForContactSitesPair, firstSegmentClone, secondSegmentClone);
+      // this.wrapper.contactSites.addContactSiteGroup(pairwiseContactSiteGroup);
+      // annotationLayerForContactSitesPair.registerDisposer(colorWidget.model.changed.add(() => {
+      //   elementsList.forEach(element => {
+      //     const positionElement =
+      //         element.querySelector('.neuroglancer-multicut-voxel-coordinates-link');
+      //     (<HTMLElement>positionElement!).style.color = colorWidget.model.toString();
+      //   });
+      // }));
+      // this.contactSitesPairwiseGroup.appendFlexibleChild(
+      //     minimizableGroupForContactSitesPair.element);
+    });
+    // addSegmentElement.appendChild(getContactSitesButton);
+    // testSpan.appendChild(getContactSitesButton);
+    this.contactSitesPairwiseGroup.appendFixedChild(addSegmentElement);
+    this.contactSitesPairwiseGroup.appendFixedChild(firstSegmentDisplay);
+    this.contactSitesPairwiseGroup.appendFixedChild(secondSegmentDisplay);
+    this.contactSitesPairwiseGroup.appendFixedChild(contactSiteNameInputLabel);
+    // this.contactSitesPairwiseGroup.appendFixedChild(locationModeDropdown);
+    // this.contactSitesPairwiseGroup.appendFixedChild(getContactSitesButton);
+    this.contactSitesPairwiseGroup.appendFixedChild(getContactSitesButton);
+    this.wrapper.contactSites.pairwiseContactSitesList.forEach(pairwiseContactSiteGroup => {
       // const testMin = new MinimizableGroupWidget('Contact Site Pair #2');
-      const button1Test = document.createElement('button');
-      button1Test.textContent = 'B1';
+      // const button1Test = document.createElement('button');
+      // button1Test.textContent = 'B1';
       // button1Test.style.paddingBottom = '0px';
-      button1Test.style.verticalAlign = 'bottom';
+      // button1Test.style.verticalAlign = 'bottom';
       // button1Test.style.marginBottom = '0px';
+      const groupDisplayedOrHidden = new TrackableBoolean(true);
+      const showOrHideContactSitesGroupCheckbox =
+          new TrackableBooleanCheckbox(groupDisplayedOrHidden);
       const deleteGroupButton = document.createElement('button');
       deleteGroupButton.textContent = 'x';
       deleteGroupButton.style.verticalAlign = 'bottom';
       numberOfContactSitesPairs++;
-      const contactSitesForPairTitle = (contactSiteNameInput.value) ?
-          contactSiteNameInput.value :
-          `Contact Sites for Pair #${numberOfContactSitesPairs}`;
-      contactSiteNameInput.value = '';
-      contactSiteNameInput.placeholder = `Contact Sites for Pair #${numberOfContactSitesPairs + 1}`;
-      secondSegment = null;
-      secondSegmentLabel.textContent = 'Segment 2: Not selected';
-      removeSecondSegmentButton.style.display = 'none';
-      firstSegment = null;
-      firstSegmentLabel.textContent = 'Segment 1: Not selected';
-      removeFirstSegmentButton.style.display = 'none';
-      const annotationColor =
-          new TrackableRGB(vec3.fromValues(Math.random(), Math.random(), Math.random()));
+      const contactSitesForPairTitle = pairwiseContactSiteGroup.name;
       const annotationLayerForContactSitesPair = new SpontaneousAnnotationLayer(
-          this.wrapper.manager.chunkManager, this.wrapper.transform, annotationColor);
-      const colorWidget =
-          annotationLayerForContactSitesPair.registerDisposer(new ColorWidget(annotationColor));
+          this.wrapper.manager.chunkManager, this.wrapper.transform,
+          pairwiseContactSiteGroup.color);
+      const colorWidget = annotationLayerForContactSitesPair.registerDisposer(
+          new ColorWidget(pairwiseContactSiteGroup.color));
       setAnnotationHoverStateFromMouseState(
           annotationLayerForContactSitesPair.annotationLayerState,
           this.wrapper.manager.layerSelectedValues.mouseState);
       annotationLayerForContactSitesPair.renderLayers.forEach(renderLayer => {
         this.wrapper.addRenderLayer(renderLayer);
       });
+      annotationLayerForContactSitesPair.registerDisposer(groupDisplayedOrHidden.changed.add(
+          () => {
+              // annotationLayerForContactSitesPair.renderLayers.forEach(renderLayer => {
+              //   if (groupDisplayedOrHidden.value) {
+              //     this.wrapper.renderLayers.push(renderLayer);
+              //     // this.wrapper.addRenderLayer(renderLayer);
+              //   } else {
+              //     const index = this.wrapper.renderLayers.indexOf(renderLayer);
+              //     if (index !== -1) {
+              //       this.wrapper.renderLayers.splice(index, 1);
+              //     } else {
+              //       console.log('Layer not found contact sites checkbox');
+              //     }
+              //     // this.wrapper.removeRenderLayer(renderLayer);
+              //   }
+              // });
+              // this.wrapper.specificationChanged.dispatch();
+              // if (groupDisplayedOrHidden.value) {
+              //   // swap out annotation source
+              // } else {
+
+              // }
+          }));
       colorWidget.element.style.height = '1.3em';
       colorWidget.element.style.width = '1.5em';
       // colorWidget.element.style.paddingBottom = '0.2em';
       colorWidget.element.style.top = '-10%';
       const minimizableGroupForContactSitesPair = new MinimizableGroupWidgetWithHeader(
-          contactSitesForPairTitle, [button1Test, colorWidget.element, deleteGroupButton]);
+          contactSitesForPairTitle,
+          [showOrHideContactSitesGroupCheckbox.element, colorWidget.element, deleteGroupButton]);
       minimizableGroupForContactSitesPair.element.style.marginLeft = '6%';
       deleteGroupButton.addEventListener('click', () => {
         const deleteConfirmed = confirm(
@@ -612,29 +791,23 @@ export class GraphOperationLayerView extends Tab {
           annotationLayerForContactSitesPair.dispose();
           numberOfContactSitesPairs--;
           removeFromParent(minimizableGroupForContactSitesPair.element);
+          this.wrapper.contactSites.deleteContactSiteGroup(pairwiseContactSiteGroup);
         }
       });
-      const elementsList = this.addRandomPoints(
-          minimizableGroupForContactSitesPair, annotationLayerForContactSitesPair,
-          firstSegmentClone, secondSegmentClone);
+      const elementsList = this.addPointsFromContactSites(
+          pairwiseContactSiteGroup, minimizableGroupForContactSitesPair,
+          annotationLayerForContactSitesPair, pairwiseContactSiteGroup.segment1,
+          pairwiseContactSiteGroup.segment2);
       annotationLayerForContactSitesPair.registerDisposer(colorWidget.model.changed.add(() => {
         elementsList.forEach(element => {
-          const positionElement = element.querySelector('.neuroglancer-multicut-voxel-coordinates-link');
+          const positionElement =
+              element.querySelector('.neuroglancer-multicut-voxel-coordinates-link');
           (<HTMLElement>positionElement!).style.color = colorWidget.model.toString();
         });
       }));
       this.contactSitesPairwiseGroup.appendFlexibleChild(
           minimizableGroupForContactSitesPair.element);
     });
-    // addSegmentElement.appendChild(getContactSitesButton);
-    // testSpan.appendChild(getContactSitesButton);
-    this.contactSitesPairwiseGroup.appendFixedChild(addSegmentElement);
-    this.contactSitesPairwiseGroup.appendFixedChild(firstSegmentDisplay);
-    this.contactSitesPairwiseGroup.appendFixedChild(secondSegmentDisplay);
-    this.contactSitesPairwiseGroup.appendFixedChild(contactSiteNameInputLabel);
-    // this.contactSitesPairwiseGroup.appendFixedChild(locationModeDropdown);
-    // this.contactSitesPairwiseGroup.appendFixedChild(getContactSitesButton);
-    this.contactSitesPairwiseGroup.appendFixedChild(getContactSitesButton);
     // const testMin = new MinimizableGroupWidget('Inner MG');
     // for (let i = 0; i < 80; i++) {
     //   const testDiv = document.createElement('div');
@@ -649,6 +822,7 @@ export class GraphOperationLayerView extends Tab {
 
   // groupWidget: MinimizableGroupWidgetWithHeader,
   private addRandomPoints(
+      pairwiseContactSiteGroup: PairwiseContactSites,
       minimizableGroupForContactSitesPair: MinimizableGroupWidgetWithHeader,
       annotationLayerForContactSitesPair: SpontaneousAnnotationLayer, firstSegment: Uint64,
       secondSegment: Uint64): HTMLElement[] {
@@ -658,12 +832,57 @@ export class GraphOperationLayerView extends Tab {
       let randomNum1 = Math.random() * 1000;
       let randomNum2 = Math.random() * 1000;
       let randomNum3 = Math.random() * 1000;
+      let randomNum4 = Math.random() * 100;
       const contactSitePoint: Point = {
         id: '',
         segments: [firstSegment, secondSegment],
-        description: `Area = ${randomNum1}`,
+        description: `Area = ${randomNum4}`,
         point: vec3.fromValues(
             (169000 + randomNum1) * 4, (67500 + randomNum2) * 4, (4200 + randomNum3) * 40),
+        type: AnnotationType.POINT
+      };
+      pairwiseContactSiteGroup.contactSites.push(
+          {coordinate: contactSitePoint.point, area: randomNum4});
+      annotationLayerForContactSitesPair.source.add(contactSitePoint);
+      const element = this.makeAnnotationListElement(
+          contactSitePoint, annotationLayerForContactSitesPair.transform.transform,
+          annotationLayerForContactSitesPair.color.toString(), false);
+      element.addEventListener('mouseenter', () => {
+        this.annotationLayer.hoverState.value = {id: contactSitePoint.id};
+      });
+      element.addEventListener('click', () => {
+        this.state.value = {id: contactSitePoint.id};
+      });
+      element.addEventListener('mouseup', (event: MouseEvent) => {
+        if (event.button === 2) {
+          this.setSpatialCoordinates(
+              getCenterPosition(contactSitePoint, this.annotationLayer.objectToGlobal));
+        }
+      });
+      const description = document.createElement('div');
+      description.className = 'neuroglancer-annotation-description';
+      description.textContent = `Area = ${randomNum4}`;
+      element.appendChild(description);
+      annotationList.appendChild(element);
+      elementsList.push(element);
+    }
+    minimizableGroupForContactSitesPair.appendFixedChild(annotationList);
+    return elementsList;
+  }
+
+  private addPointsFromContactSites(
+      pairwiseContactSiteGroup: PairwiseContactSites,
+      minimizableGroupForContactSitesPair: MinimizableGroupWidgetWithHeader,
+      annotationLayerForContactSitesPair: SpontaneousAnnotationLayer, firstSegment: Uint64,
+      secondSegment: Uint64): HTMLElement[] {
+    const annotationList = document.createElement('ul');
+    const elementsList: HTMLElement[] = [];
+    pairwiseContactSiteGroup.contactSites.forEach(contactSite => {
+      const contactSitePoint: Point = {
+        id: '',
+        segments: [firstSegment, secondSegment],
+        description: `Area = ${contactSite.area}`,
+        point: contactSite.coordinate,
         type: AnnotationType.POINT
       };
       annotationLayerForContactSitesPair.source.add(contactSitePoint);
@@ -684,11 +903,11 @@ export class GraphOperationLayerView extends Tab {
       });
       const description = document.createElement('div');
       description.className = 'neuroglancer-annotation-description';
-      description.textContent = `Area = ${randomNum1}`;
+      description.textContent = `Area = ${contactSite.area}`;
       element.appendChild(description);
       annotationList.appendChild(element);
       elementsList.push(element);
-    }
+    });
     minimizableGroupForContactSitesPair.appendFixedChild(annotationList);
     return elementsList;
   }
