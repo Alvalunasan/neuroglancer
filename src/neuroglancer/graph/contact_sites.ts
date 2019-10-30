@@ -18,7 +18,7 @@ import {vec3} from 'gl-matrix';
 
 import {LocalAnnotationSource} from '../annotation';
 import {TrackableRGB} from '../util/color';
-import {RefCounted, Disposer} from '../util/disposable';
+import {Disposer, RefCounted} from '../util/disposable';
 import {verify3dVec, verifyArray, verifyString} from '../util/json';
 import {NullarySignal} from '../util/signal';
 import {Uint64} from '../util/uint64';
@@ -35,8 +35,7 @@ const CONTACT_SITES_GROUP_NAME_JSON_KEY = 'name';
 const COORDINATE_JSON_KEY = 'coordinate';
 const AREA_JSON_KEY = 'area';
 
-abstract class ContactSitesGroup extends RefCounted {
-  // protected _name: string;
+abstract class ContactSiteGroup extends RefCounted {
   changed = this.registerDisposer(new NullarySignal());
 
   constructor(protected _name: string) {
@@ -53,19 +52,11 @@ abstract class ContactSitesGroup extends RefCounted {
   }
 
   toJSON() {
-    return {
-      [CONTACT_SITES_GROUP_NAME_JSON_KEY]: this._name
-    };
+    return {[CONTACT_SITES_GROUP_NAME_JSON_KEY]: this._name};
   }
 }
 
-export class PairwiseContactSites extends ContactSitesGroup {
-  // color = new TrackableRGB(vec3.fromValues(0.0, 0.0, 0.0));
-  // private _name: string;
-  // segment1: Uint64;
-  // segment2: Uint64;
-  // contactSites: ContactSite[] = [];
-
+export class PairwiseContactSites extends ContactSiteGroup {
   constructor(
       public segment1: Uint64, public segment2: Uint64, public contactSites: ContactSite[],
       public color: TrackableRGB, name: string) {
@@ -101,7 +92,8 @@ export class PairwiseContactSites extends ContactSitesGroup {
     const contactSitesJSON: any[] = [];
     this.contactSites.forEach(contactSite => {
       contactSitesJSON.push({
-        [COORDINATE_JSON_KEY]: [contactSite.coordinate[0], contactSite.coordinate[1], contactSite.coordinate[2]],
+        [COORDINATE_JSON_KEY]:
+            [contactSite.coordinate[0], contactSite.coordinate[1], contactSite.coordinate[2]],
         [AREA_JSON_KEY]: contactSite.area
       });
     });
@@ -115,11 +107,9 @@ const PARTNERS_JSON_KEY = 'partners';
 const PARTNER_ROOT_JSON_KEY = 'partnerId';
 const AREAS_JSON_KEY = 'areas';
 
-export class AllContactSitesForRoot extends ContactSitesGroup {
-  // root: Uint64;
-  // Map from each partner root to a list of areas (each contact site is represented by its area
-  // here)
-  // partners: Map<Uint64, number[]>;
+export class ContactPartnersForRoot extends ContactSiteGroup {
+  // partners is a map from each partner root to a list of areas (each contact site is
+  // represented by its area here)
 
   constructor(public root: Uint64, public partners: Map<Uint64, number[]>, name: string) {
     super(name);
@@ -154,7 +144,7 @@ export class AllContactSitesForRoot extends ContactSitesGroup {
         partners.set(partnerId, contactSiteAreas);
       });
     }
-    return new AllContactSitesForRoot(root, partners, name);
+    return new ContactPartnersForRoot(root, partners, name);
   }
 
   toJSON() {
@@ -172,34 +162,34 @@ export class AllContactSitesForRoot extends ContactSitesGroup {
 }
 
 const PAIRWISE_CONTACT_SITES_JSON_KEY = 'pairwiseContactSites';
-const ALL_CONTACT_SITES_FOR_ROOT_JSON_KEY = 'contactSitesForRoot';
+const CONTACT_PARTNERS_FOR_ROOT_JSON_KEY = 'contactPartnersForRoot';
 const SELECTED_SEGMENT1_JSON_KEY = 'selectedSegment1';
 const SELECTED_SEGMENT2_JSON_KEY = 'selectedSegment2';
 const SELECT_ROOT_SEGMENT_JSON_KEY = 'selectedRoot';
 
 export class ContactSites extends RefCounted {
-  pairwiseContactSitesList: PairwiseContactSites[] = [];
-  contactSitesForRootList: AllContactSitesForRoot[] = [];
+  pairwiseContactSiteLists: PairwiseContactSites[] = [];
+  contactPartnersForRootList: ContactPartnersForRoot[] = [];
   selectedSegment1?: Uint64;
   selectedSegment2?: Uint64;
   selectedRoot?: Uint64;
   changed = this.registerDisposer(new NullarySignal());
-  private disposerMap = new Map<ContactSitesGroup, Disposer>();
+  private disposerMap = new Map<ContactSiteGroup, Disposer>();
 
   // constructor() {
   //   super();
 
   // }
 
-  addContactSiteGroup(contactSiteGroup: ContactSitesGroup) {
+  addContactSiteGroup(contactSiteGroup: ContactSiteGroup) {
     if (contactSiteGroup instanceof PairwiseContactSites) {
-      this.pairwiseContactSitesList.push(contactSiteGroup);
+      this.pairwiseContactSiteLists.push(contactSiteGroup);
       this.registerDisposer(contactSiteGroup);
       const signalDisposer = contactSiteGroup.changed.add(this.changed.dispatch);
       this.disposerMap.set(contactSiteGroup, signalDisposer);
       this.registerDisposer(signalDisposer);
-    } else if (contactSiteGroup instanceof AllContactSitesForRoot) {
-      this.contactSitesForRootList.push(contactSiteGroup);
+    } else if (contactSiteGroup instanceof ContactPartnersForRoot) {
+      this.contactPartnersForRootList.push(contactSiteGroup);
       this.registerDisposer(contactSiteGroup);
       const signalDisposer = contactSiteGroup.changed.add(this.changed.dispatch);
       this.disposerMap.set(contactSiteGroup, signalDisposer);
@@ -210,24 +200,24 @@ export class ContactSites extends RefCounted {
     }
   }
 
-  deleteContactSiteGroup(contactSiteGroup: ContactSitesGroup) {
+  deleteContactSiteGroup(contactSiteGroup: ContactSiteGroup) {
     if (contactSiteGroup instanceof PairwiseContactSites) {
-      const index = this.pairwiseContactSitesList.indexOf(contactSiteGroup);
+      const index = this.pairwiseContactSiteLists.indexOf(contactSiteGroup);
       if (index !== -1) {
         this.unregisterDisposer(this.disposerMap.get(contactSiteGroup)!);
         this.disposerMap.delete(contactSiteGroup);
         this.unregisterDisposer(contactSiteGroup);
-        this.pairwiseContactSitesList.splice(index, 1);
+        this.pairwiseContactSiteLists.splice(index, 1);
         contactSiteGroup.dispose();
         return true;
       }
-    } else if (contactSiteGroup instanceof AllContactSitesForRoot) {
-      const index = this.contactSitesForRootList.indexOf(contactSiteGroup);
+    } else if (contactSiteGroup instanceof ContactPartnersForRoot) {
+      const index = this.contactPartnersForRootList.indexOf(contactSiteGroup);
       if (index !== -1) {
         this.unregisterDisposer(this.disposerMap.get(contactSiteGroup)!);
         this.disposerMap.delete(contactSiteGroup);
         this.unregisterDisposer(contactSiteGroup);
-        this.pairwiseContactSitesList.splice(index, 1);
+        this.pairwiseContactSiteLists.splice(index, 1);
         contactSiteGroup.dispose();
         return true;
       }
@@ -245,15 +235,15 @@ export class ContactSites extends RefCounted {
       const curContactSitesGroupObject =
           this.registerDisposer(PairwiseContactSites.fromSpecification(contactSitesGroup));
       this.registerDisposer(curContactSitesGroupObject.changed.add(this.changed.dispatch));
-      this.pairwiseContactSitesList.push(curContactSitesGroupObject);
+      this.pairwiseContactSiteLists.push(curContactSitesGroupObject);
     });
-    const contactSitesForRootsSpec = specification[ALL_CONTACT_SITES_FOR_ROOT_JSON_KEY];
-    const contactSitesForRoots = verifyArray(contactSitesForRootsSpec);
-    contactSitesForRoots.forEach(contactSitesGroup => {
+    const contactPartnersForRootsSpec = specification[CONTACT_PARTNERS_FOR_ROOT_JSON_KEY];
+    const contactPartnersForRoots = verifyArray(contactPartnersForRootsSpec);
+    contactPartnersForRoots.forEach(contactSitesGroup => {
       const curContactSitesGroupObject =
-          this.registerDisposer(AllContactSitesForRoot.fromSpecification(contactSitesGroup));
+          this.registerDisposer(ContactPartnersForRoot.fromSpecification(contactSitesGroup));
       this.registerDisposer(curContactSitesGroupObject.changed.add(this.changed.dispatch));
-      this.contactSitesForRootList.push(curContactSitesGroupObject);
+      this.contactPartnersForRootList.push(curContactSitesGroupObject);
     });
     const selectedSegment1 = specification[SELECTED_SEGMENT1_JSON_KEY];
     if (selectedSegment1 !== undefined) {
@@ -272,15 +262,15 @@ export class ContactSites extends RefCounted {
   toJSON() {
     const x: any = {};
     const pairwiseContactSitesJSON: any[] = [];
-    this.pairwiseContactSitesList.forEach(contactSitesGroup => {
+    this.pairwiseContactSiteLists.forEach(contactSitesGroup => {
       pairwiseContactSitesJSON.push(contactSitesGroup.toJSON());
     });
     x[PAIRWISE_CONTACT_SITES_JSON_KEY] = pairwiseContactSitesJSON;
-    const contactSitesForRootsJSON: any[] = [];
-    this.contactSitesForRootList.forEach(contactSitesGroup => {
-      contactSitesForRootsJSON.push(contactSitesGroup.toJSON());
+    const contactPartnersForRootsJSON: any[] = [];
+    this.contactPartnersForRootList.forEach(contactSitesGroup => {
+      contactPartnersForRootsJSON.push(contactSitesGroup.toJSON());
     });
-    x[ALL_CONTACT_SITES_FOR_ROOT_JSON_KEY] = contactSitesForRootsJSON;
+    x[CONTACT_PARTNERS_FOR_ROOT_JSON_KEY] = contactPartnersForRootsJSON;
     if (this.selectedSegment1) {
       x[SELECTED_SEGMENT1_JSON_KEY] = this.selectedSegment1.toJSON();
     }

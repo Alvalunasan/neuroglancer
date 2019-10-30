@@ -549,6 +549,7 @@ export interface SegmentationUserLayerWithGraph extends SegmentationUserLayer {
   contactPointsAnnotationSource: LocalAnnotationSource;
   // contactPointsAnnotationSource: LocalAnnotationSource;
   contactSites: ContactSites;
+  displayState: SegmentationUserLayerWithGraphDisplayState;
 }
 
 /**

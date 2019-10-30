@@ -26,7 +26,7 @@ import {Uint64Set} from 'neuroglancer/uint64_set';
 import {vec3} from 'neuroglancer/util/geom';
 import {Uint64} from 'neuroglancer/util/uint64';
 import {RPC} from 'neuroglancer/worker_rpc';
-import { ContactSite } from 'src/neuroglancer/graph/contact_sites';
+import {ContactSite} from 'src/neuroglancer/graph/contact_sites';
 
 export const GRAPH_SERVER_NOT_SPECIFIED = Symbol('Graph Server Not Specified.');
 
@@ -199,6 +199,25 @@ export class ChunkedGraphLayer extends GenericSliceViewRenderLayer {
     }
     const jsonIllegalSplitKey = 'illegal_split';
     return {supervoxelConnectedComponents, isSplitIllegal: jsonResp[jsonIllegalSplitKey]};
+  }
+
+  async getContactPartnersForRoot(root: Uint64, timestamp?: string):
+      Promise<Map<Uint64, number[]>> {
+    const {url} = this;
+    if (url === '') {
+      return Promise.reject(GRAPH_SERVER_NOT_SPECIFIED);
+    }
+
+    const promise = authFetch(`${url}/node/${String(root)}/contact_sites?int64_as_str=1&partners=1${
+        timestamp ? `&timestamp=${timestamp}` : ``}`);
+
+    const response = await this.withErrorMessage(promise, {
+      initialMessage: `Retrieving all contact partners for ${root}`,
+      errorPrefix: `Could not get contact partners: `
+    });
+
+    const contactPartnersList = await response.json();
+    return contactPartnersList;
   }
 
   draw() {}

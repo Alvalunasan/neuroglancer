@@ -58,6 +58,7 @@ import {PairwiseContactSites} from '../graph/contact_sites';
 import {TrackableBoolean, TrackableBooleanCheckbox} from '../trackable_boolean';
 import {TrackableRGB} from '../util/color';
 import {ColorWidget} from '../widget/color';
+import {PairwiseContactSitesWidget, AllContactSitesForRootWidget} from '../widget/contact_sites_widget';
 import {Uint64EntryWidget} from '../widget/uint64_entry_widget';
 
 type GraphOperationMarkerId = {
@@ -294,10 +295,10 @@ export class GraphOperationLayerView extends Tab {
   multicutGroup = this.registerDisposer(new MinimizableGroupWidget('Multicut'));
   multicutOpacityGroup = this.registerDisposer(new MinimizableGroupWidget('Multicut Opacity'));
   timectrlGroup = this.registerDisposer(new MinimizableGroupWidget('Time Control'));
-  contactSitesPairwiseGroup =
-      this.registerDisposer(new MinimizableGroupWidget('Contact Sites (for pair)'));
-  contactSitesSingleRootGroup =
-      this.registerDisposer(new MinimizableGroupWidget('Contact Sites (for single root)'));
+  // contactSitesPairwiseGroup =
+  //     this.registerDisposer(new MinimizableGroupWidget('Contact Sites (for pair)'));
+  // contactSitesSingleRootGroup =
+  //     this.registerDisposer(new MinimizableGroupWidget('Contact Sites (for single root)'));
   timeWidget: TimeSegmentWidget|undefined;
 
   constructor(
@@ -401,7 +402,7 @@ export class GraphOperationLayerView extends Tab {
     this.multicutGroup.appendFlexibleChild(this.annotationListContainer);
     this.element.appendChild(this.multicutGroup.element);
 
-    const displayState = <SegmentationUserLayerWithGraphDisplayState>(this.wrapper.displayState);
+    const displayState = this.wrapper.displayState;
 
     const otherSegmentsAlphaWidget = this.registerDisposer(
         new RangeWidget(displayState.multicutDisplayInformation.otherSegmentsAlpha));
@@ -452,372 +453,13 @@ export class GraphOperationLayerView extends Tab {
       }
     }));
 
-    const addSegmentLabel = document.createElement('span');
-    addSegmentLabel.textContent = 'Enter segment IDs: ';
-    // this.contactSitesPairwiseGroup.appendFixedChild(addSegmentLabel);
-    const addSegmentInput = this.registerDisposer(new Uint64EntryWidget());
-    addSegmentInput.element.style.display = 'inline-block';
-    // addSegmentInput.element.style.width = '30%';
-    const addSegmentElement = document.createElement('div');
-    addSegmentElement.appendChild(addSegmentLabel);
-    addSegmentElement.appendChild(addSegmentInput.element);
-    let firstSegment: Uint64|null = null;
-    let secondSegment: Uint64|null = null;
-    const segmentInputDone = () => {
-      return firstSegment && secondSegment;
-    };
-    const firstSegmentDisplay = document.createElement('div');
-    // firstSegmentDisplay.style.display = 'none';
-    const firstSegmentLabel = document.createElement('label');
-    firstSegmentLabel.className = 'neuroglancer-select-text';
-    firstSegmentLabel.textContent = 'Segment 1: Not selected';
-    const removeFirstSegmentButton = document.createElement('button');
-    removeFirstSegmentButton.textContent = 'x';
-    removeFirstSegmentButton.addEventListener('click', () => {
-      firstSegment = null;
-      firstSegmentLabel.textContent = 'Segment 1: Not selected';
-      removeFirstSegmentButton.style.display = 'none';
-      // firstSegmentDisplay.style.display = 'none';
-    });
-    removeFirstSegmentButton.style.display = 'none';
-    firstSegmentDisplay.appendChild(firstSegmentLabel);
-    firstSegmentDisplay.appendChild(removeFirstSegmentButton);
-    const secondSegmentDisplay = document.createElement('div');
-    // secondSegmentDisplay.style.display = 'none';
-    const secondSegmentLabel = document.createElement('label');
-    secondSegmentLabel.className = 'neuroglancer-select-text';
-    secondSegmentLabel.textContent = 'Segment 2: Not selected';
-    const removeSecondSegmentButton = document.createElement('button');
-    removeSecondSegmentButton.textContent = 'x';
-    removeSecondSegmentButton.addEventListener('click', () => {
-      secondSegment = null;
-      secondSegmentLabel.textContent = 'Segment 2: Not selected';
-      removeSecondSegmentButton.style.display = 'none';
-      // secondSegmentDisplay.style.display = 'none';
-    });
-    removeSecondSegmentButton.style.display = 'none';
-    secondSegmentDisplay.appendChild(secondSegmentLabel);
-    secondSegmentDisplay.appendChild(removeSecondSegmentButton);
-    this.registerDisposer(addSegmentInput.valuesEntered.add((values) => {
-      for (let i = 0; i < values.length; i++) {
-        if (segmentInputDone()) {
-          StatusMessage.showTemporaryMessage('Two segments already selected.', 3000);
-          break;
-        }
-        if (firstSegment) {
-          secondSegment = values[i];
-          secondSegmentLabel.textContent = `Segment 2: ${secondSegment.toString()}`;
-          removeSecondSegmentButton.style.display = '';
-          // secondSegmentDisplay.style.display = '';
-        } else {
-          firstSegment = values[i];
-          firstSegmentLabel.textContent = `Segment 1: ${firstSegment.toString()}`;
-          removeFirstSegmentButton.style.display = '';
-          // firstSegmentDisplay.style.display = '';
-        }
-      }
-    }));
-    const contactSiteNameInputLabel = document.createElement('label');
-    contactSiteNameInputLabel.textContent = 'Alias for contact sites: ';
-    const contactSiteNameInput = document.createElement('input');
-    contactSiteNameInputLabel.appendChild(contactSiteNameInput);
-    contactSiteNameInput.placeholder = 'Contact Sites for Pair #1';
-    const getContactSitesButton = document.createElement('button');
-    getContactSitesButton.textContent = 'Get contact sites';
-    // getContactSitesButton.style.display = 'inline-block';
-    // getContactSitesButton.textContent = 'G';
-    let numberOfContactSitesPairs = 0;
-    getContactSitesButton.addEventListener('click', () => {
-      if (firstSegment === null || secondSegment === null) {
-        StatusMessage.showTemporaryMessage('You must enter two segment IDs first.', 5000);
-      } else if (Uint64.equal(firstSegment, secondSegment)) {
-        StatusMessage.showTemporaryMessage('The two segments must not be equal', 5000);
-      } else {
-        const firstSegmentClone = firstSegment.clone();
-        const secondSegmentClone = secondSegment.clone();
-        this.wrapper.chunkedGraphLayer!
-            .getContactSitesForPair(firstSegment, secondSegment, displayState.timestamp.value)
-            .then((contactSites) => {
-              if (contactSites.length === 0) {
-                StatusMessage.showTemporaryMessage(`${firstSegmentClone.toString()} and ${
-                    secondSegmentClone.toString()} do not have any contact sites`);
-              } else {
-                StatusMessage.showTemporaryMessage(
-                    `Contact sites between ${firstSegmentClone.toString()} and ${
-                        secondSegmentClone.toString()} retrieved!`,
-                    5000);
-              }
-              // const testMin = new MinimizableGroupWidget(
-              //     `${firstSegmentClone.toString()} & ${secondSegmentClone.toString()}`);
-              // testMin.element.style.marginLeft = '10%';
-              // contactSites.forEach(contactSite => {
-              //   const contactSitePoint: Point = {
-              //     id: '',
-              //     segments: [firstSegmentClone, secondSegmentClone],
-              //     description: `Area = ${contactSite.area.toString()}`,
-              //     point: contactSite.coordinate,
-              //     type: AnnotationType.POINT
-              //   };
-              //   this.wrapper.contactPointsAnnotationSource.add(contactSitePoint);
-              // });
-              // this.contactSitesPairwiseGroup.appendFlexibleChild(testMin.element);
-
-              // const firstSegmentClone = firstSegment!.clone();
-              // const secondSegmentClone = secondSegment!.clone();
-              // const testMin = new MinimizableGroupWidget('Contact Site Pair #2');
-              const button1Test = document.createElement('button');
-              button1Test.textContent = 'B1';
-              // button1Test.style.paddingBottom = '0px';
-              button1Test.style.verticalAlign = 'bottom';
-              // button1Test.style.marginBottom = '0px';
-              const deleteGroupButton = document.createElement('button');
-              deleteGroupButton.textContent = 'x';
-              deleteGroupButton.style.verticalAlign = 'bottom';
-              numberOfContactSitesPairs++;
-              const contactSitesForPairTitle = (contactSiteNameInput.value) ?
-                  contactSiteNameInput.value :
-                  `Contact Sites for Pair #${numberOfContactSitesPairs}`;
-              contactSiteNameInput.value = '';
-              contactSiteNameInput.placeholder =
-                  `Contact Sites for Pair #${numberOfContactSitesPairs + 1}`;
-              secondSegment = null;
-              secondSegmentLabel.textContent = 'Segment 2: Not selected';
-              removeSecondSegmentButton.style.display = 'none';
-              firstSegment = null;
-              firstSegmentLabel.textContent = 'Segment 1: Not selected';
-              removeFirstSegmentButton.style.display = 'none';
-              const annotationColor = new TrackableRGB(vec3.fromValues(0.0, 0.0, 0.0));
-              annotationColor.value = vec3.fromValues(Math.random(), Math.random(), Math.random());
-              const annotationLayerForContactSitesPair = new SpontaneousAnnotationLayer(
-                  this.wrapper.manager.chunkManager, this.wrapper.transform, annotationColor);
-              const colorWidget = annotationLayerForContactSitesPair.registerDisposer(
-                  new ColorWidget(annotationColor));
-              setAnnotationHoverStateFromMouseState(
-                  annotationLayerForContactSitesPair.annotationLayerState,
-                  this.wrapper.manager.layerSelectedValues.mouseState);
-              annotationLayerForContactSitesPair.renderLayers.forEach(renderLayer => {
-                this.wrapper.addRenderLayer(renderLayer);
-              });
-              colorWidget.element.style.height = '1.3em';
-              colorWidget.element.style.width = '1.5em';
-              // colorWidget.element.style.paddingBottom = '0.2em';
-              colorWidget.element.style.top = '-10%';
-              const minimizableGroupForContactSitesPair = new MinimizableGroupWidgetWithHeader(
-                  contactSitesForPairTitle, [button1Test, colorWidget.element, deleteGroupButton]);
-              minimizableGroupForContactSitesPair.element.style.marginLeft = '6%';
-              deleteGroupButton.addEventListener('click', () => {
-                const deleteConfirmed =
-                    confirm(`Are you sure you want to delete contact sites group ${
-                        contactSitesForPairTitle}?`);
-                if (deleteConfirmed) {
-                  annotationLayerForContactSitesPair.renderLayers.forEach(renderLayer => {
-                    this.wrapper.removeRenderLayer(renderLayer);
-                  });
-                  annotationLayerForContactSitesPair.dispose();
-                  numberOfContactSitesPairs--;
-                  removeFromParent(minimizableGroupForContactSitesPair.element);
-                }
-              });
-              const pairwiseContactSiteGroup = new PairwiseContactSites(
-                  firstSegmentClone, secondSegmentClone, contactSites, colorWidget.model,
-                  contactSitesForPairTitle);
-              const elementsList = this.addPointsFromContactSites(
-                  pairwiseContactSiteGroup, minimizableGroupForContactSitesPair,
-                  annotationLayerForContactSitesPair, firstSegmentClone, secondSegmentClone);
-              annotationLayerForContactSitesPair.registerDisposer(
-                  colorWidget.model.changed.add(() => {
-                    elementsList.forEach(element => {
-                      const positionElement =
-                          element.querySelector('.neuroglancer-multicut-voxel-coordinates-link');
-                      (<HTMLElement>positionElement!).style.color = colorWidget.model.toString();
-                    });
-                  }));
-              this.wrapper.contactSites.addContactSiteGroup(pairwiseContactSiteGroup);
-              annotationLayerForContactSitesPair.registerDisposer(
-                  colorWidget.model.changed.add(() => {
-                    elementsList.forEach(element => {
-                      const positionElement =
-                          element.querySelector('.neuroglancer-multicut-voxel-coordinates-link');
-                      (<HTMLElement>positionElement!).style.color = colorWidget.model.toString();
-                    });
-                  }));
-              this.contactSitesPairwiseGroup.appendFlexibleChild(
-                  minimizableGroupForContactSitesPair.element);
-            });
-      }
-      // const firstSegmentClone = firstSegment!.clone();
-      // const secondSegmentClone = secondSegment!.clone();
-      // // const testMin = new MinimizableGroupWidget('Contact Site Pair #2');
-      // const button1Test = document.createElement('button');
-      // button1Test.textContent = 'B1';
-      // // button1Test.style.paddingBottom = '0px';
-      // button1Test.style.verticalAlign = 'bottom';
-      // // button1Test.style.marginBottom = '0px';
-      // const deleteGroupButton = document.createElement('button');
-      // deleteGroupButton.textContent = 'x';
-      // deleteGroupButton.style.verticalAlign = 'bottom';
-      // numberOfContactSitesPairs++;
-      // const contactSitesForPairTitle = (contactSiteNameInput.value) ?
-      //     contactSiteNameInput.value :
-      //     `Contact Sites for Pair #${numberOfContactSitesPairs}`;
-      // contactSiteNameInput.value = '';
-      // contactSiteNameInput.placeholder = `Contact Sites for Pair #${numberOfContactSitesPairs +
-      // 1}`; secondSegment = null; secondSegmentLabel.textContent = 'Segment 2: Not selected';
-      // removeSecondSegmentButton.style.display = 'none';
-      // firstSegment = null;
-      // firstSegmentLabel.textContent = 'Segment 1: Not selected';
-      // removeFirstSegmentButton.style.display = 'none';
-      // const annotationColor = new TrackableRGB(vec3.fromValues(0.0, 0.0, 0.0));
-      // annotationColor.value = vec3.fromValues(Math.random(), Math.random(), Math.random());
-      // const annotationLayerForContactSitesPair = new SpontaneousAnnotationLayer(
-      //     this.wrapper.manager.chunkManager, this.wrapper.transform, annotationColor);
-      // const colorWidget =
-      //     annotationLayerForContactSitesPair.registerDisposer(new ColorWidget(annotationColor));
-      // setAnnotationHoverStateFromMouseState(
-      //     annotationLayerForContactSitesPair.annotationLayerState,
-      //     this.wrapper.manager.layerSelectedValues.mouseState);
-      // annotationLayerForContactSitesPair.renderLayers.forEach(renderLayer => {
-      //   this.wrapper.addRenderLayer(renderLayer);
-      // });
-      // colorWidget.element.style.height = '1.3em';
-      // colorWidget.element.style.width = '1.5em';
-      // // colorWidget.element.style.paddingBottom = '0.2em';
-      // colorWidget.element.style.top = '-10%';
-      // const minimizableGroupForContactSitesPair = new MinimizableGroupWidgetWithHeader(
-      //     contactSitesForPairTitle, [button1Test, colorWidget.element, deleteGroupButton]);
-      // minimizableGroupForContactSitesPair.element.style.marginLeft = '6%';
-      // deleteGroupButton.addEventListener('click', () => {
-      //   const deleteConfirmed = confirm(
-      //       `Are you sure you want to delete contact sites group ${contactSitesForPairTitle}?`);
-      //   if (deleteConfirmed) {
-      //     annotationLayerForContactSitesPair.renderLayers.forEach(renderLayer => {
-      //       this.wrapper.removeRenderLayer(renderLayer);
-      //     });
-      //     annotationLayerForContactSitesPair.dispose();
-      //     numberOfContactSitesPairs--;
-      //     removeFromParent(minimizableGroupForContactSitesPair.element);
-      //   }
-      // });
-      // const pairwiseContactSiteGroup = new PairwiseContactSites(
-      //     firstSegmentClone, secondSegmentClone, [], colorWidget.model,
-      //     contactSitesForPairTitle);
-      // const elementsList = this.addRandomPoints(
-      //     pairwiseContactSiteGroup, minimizableGroupForContactSitesPair,
-      //     annotationLayerForContactSitesPair, firstSegmentClone, secondSegmentClone);
-      // this.wrapper.contactSites.addContactSiteGroup(pairwiseContactSiteGroup);
-      // annotationLayerForContactSitesPair.registerDisposer(colorWidget.model.changed.add(() => {
-      //   elementsList.forEach(element => {
-      //     const positionElement =
-      //         element.querySelector('.neuroglancer-multicut-voxel-coordinates-link');
-      //     (<HTMLElement>positionElement!).style.color = colorWidget.model.toString();
-      //   });
-      // }));
-      // this.contactSitesPairwiseGroup.appendFlexibleChild(
-      //     minimizableGroupForContactSitesPair.element);
-    });
-    // addSegmentElement.appendChild(getContactSitesButton);
-    // testSpan.appendChild(getContactSitesButton);
-    this.contactSitesPairwiseGroup.appendFixedChild(addSegmentElement);
-    this.contactSitesPairwiseGroup.appendFixedChild(firstSegmentDisplay);
-    this.contactSitesPairwiseGroup.appendFixedChild(secondSegmentDisplay);
-    this.contactSitesPairwiseGroup.appendFixedChild(contactSiteNameInputLabel);
-    // this.contactSitesPairwiseGroup.appendFixedChild(locationModeDropdown);
-    // this.contactSitesPairwiseGroup.appendFixedChild(getContactSitesButton);
-    this.contactSitesPairwiseGroup.appendFixedChild(getContactSitesButton);
-    this.wrapper.contactSites.pairwiseContactSitesList.forEach(pairwiseContactSiteGroup => {
-      // const testMin = new MinimizableGroupWidget('Contact Site Pair #2');
-      // const button1Test = document.createElement('button');
-      // button1Test.textContent = 'B1';
-      // button1Test.style.paddingBottom = '0px';
-      // button1Test.style.verticalAlign = 'bottom';
-      // button1Test.style.marginBottom = '0px';
-      const groupDisplayedOrHidden = new TrackableBoolean(true);
-      const showOrHideContactSitesGroupCheckbox =
-          new TrackableBooleanCheckbox(groupDisplayedOrHidden);
-      const deleteGroupButton = document.createElement('button');
-      deleteGroupButton.textContent = 'x';
-      deleteGroupButton.style.verticalAlign = 'bottom';
-      numberOfContactSitesPairs++;
-      const contactSitesForPairTitle = pairwiseContactSiteGroup.name;
-      const annotationLayerForContactSitesPair = new SpontaneousAnnotationLayer(
-          this.wrapper.manager.chunkManager, this.wrapper.transform,
-          pairwiseContactSiteGroup.color);
-      const colorWidget = annotationLayerForContactSitesPair.registerDisposer(
-          new ColorWidget(pairwiseContactSiteGroup.color));
-      setAnnotationHoverStateFromMouseState(
-          annotationLayerForContactSitesPair.annotationLayerState,
-          this.wrapper.manager.layerSelectedValues.mouseState);
-      annotationLayerForContactSitesPair.renderLayers.forEach(renderLayer => {
-        this.wrapper.addRenderLayer(renderLayer);
-      });
-      annotationLayerForContactSitesPair.registerDisposer(groupDisplayedOrHidden.changed.add(
-          () => {
-              // annotationLayerForContactSitesPair.renderLayers.forEach(renderLayer => {
-              //   if (groupDisplayedOrHidden.value) {
-              //     this.wrapper.renderLayers.push(renderLayer);
-              //     // this.wrapper.addRenderLayer(renderLayer);
-              //   } else {
-              //     const index = this.wrapper.renderLayers.indexOf(renderLayer);
-              //     if (index !== -1) {
-              //       this.wrapper.renderLayers.splice(index, 1);
-              //     } else {
-              //       console.log('Layer not found contact sites checkbox');
-              //     }
-              //     // this.wrapper.removeRenderLayer(renderLayer);
-              //   }
-              // });
-              // this.wrapper.specificationChanged.dispatch();
-              // if (groupDisplayedOrHidden.value) {
-              //   // swap out annotation source
-              // } else {
-
-              // }
-          }));
-      colorWidget.element.style.height = '1.3em';
-      colorWidget.element.style.width = '1.5em';
-      // colorWidget.element.style.paddingBottom = '0.2em';
-      colorWidget.element.style.top = '-10%';
-      const minimizableGroupForContactSitesPair = new MinimizableGroupWidgetWithHeader(
-          contactSitesForPairTitle,
-          [showOrHideContactSitesGroupCheckbox.element, colorWidget.element, deleteGroupButton]);
-      minimizableGroupForContactSitesPair.element.style.marginLeft = '6%';
-      deleteGroupButton.addEventListener('click', () => {
-        const deleteConfirmed = confirm(
-            `Are you sure you want to delete contact sites group ${contactSitesForPairTitle}?`);
-        if (deleteConfirmed) {
-          annotationLayerForContactSitesPair.renderLayers.forEach(renderLayer => {
-            this.wrapper.removeRenderLayer(renderLayer);
-          });
-          annotationLayerForContactSitesPair.dispose();
-          numberOfContactSitesPairs--;
-          removeFromParent(minimizableGroupForContactSitesPair.element);
-          this.wrapper.contactSites.deleteContactSiteGroup(pairwiseContactSiteGroup);
-        }
-      });
-      const elementsList = this.addPointsFromContactSites(
-          pairwiseContactSiteGroup, minimizableGroupForContactSitesPair,
-          annotationLayerForContactSitesPair, pairwiseContactSiteGroup.segment1,
-          pairwiseContactSiteGroup.segment2);
-      annotationLayerForContactSitesPair.registerDisposer(colorWidget.model.changed.add(() => {
-        elementsList.forEach(element => {
-          const positionElement =
-              element.querySelector('.neuroglancer-multicut-voxel-coordinates-link');
-          (<HTMLElement>positionElement!).style.color = colorWidget.model.toString();
-        });
-      }));
-      this.contactSitesPairwiseGroup.appendFlexibleChild(
-          minimizableGroupForContactSitesPair.element);
-    });
-    // const testMin = new MinimizableGroupWidget('Inner MG');
-    // for (let i = 0; i < 80; i++) {
-    //   const testDiv = document.createElement('div');
-    //   testDiv.textContent = 'Hi';
-    //   testMin.appendFixedChild(testDiv);
-    // }
-    // testMin.element.style.marginLeft = '20%';
-    // this.contactSitesPairwiseGroup.appendFlexibleChild(testMin.element);
-    this.element.appendChild(this.contactSitesPairwiseGroup.element);
-    this.element.appendChild(this.contactSitesSingleRootGroup.element);
+    const pairwiseContactSitesWidget = this.registerDisposer(
+        new PairwiseContactSitesWidget(this.wrapper, this.addPointsFromContactSites.bind(this)));
+    const contactSitesForRootWidget = this.registerDisposer(new AllContactSitesForRootWidget(this.wrapper));
+    // this.contactSitesPairwiseGroup.appendFlexibleChild(pairwiseContactSitesWidget.element);
+    this.element.appendChild(pairwiseContactSitesWidget.groupElement.element);
+    this.element.appendChild(contactSitesForRootWidget.groupElement.element);
+    // this.element.appendChild()
   }
 
   // groupWidget: MinimizableGroupWidgetWithHeader,
@@ -873,15 +515,15 @@ export class GraphOperationLayerView extends Tab {
   private addPointsFromContactSites(
       pairwiseContactSiteGroup: PairwiseContactSites,
       minimizableGroupForContactSitesPair: MinimizableGroupWidgetWithHeader,
-      annotationLayerForContactSitesPair: SpontaneousAnnotationLayer, firstSegment: Uint64,
-      secondSegment: Uint64): HTMLElement[] {
+      annotationLayerForContactSitesPair: SpontaneousAnnotationLayer, segment1: Uint64,
+      segment2: Uint64): HTMLElement[] {
     const annotationList = document.createElement('ul');
     const elementsList: HTMLElement[] = [];
     pairwiseContactSiteGroup.contactSites.forEach(contactSite => {
       const contactSitePoint: Point = {
         id: '',
-        segments: [firstSegment, secondSegment],
-        description: `Area = ${contactSite.area}`,
+        segments: [segment1, segment2],
+        description: `Area = ${contactSite.area} vx`,
         point: contactSite.coordinate,
         type: AnnotationType.POINT
       };
