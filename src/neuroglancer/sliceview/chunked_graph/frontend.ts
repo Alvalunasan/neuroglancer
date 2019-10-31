@@ -212,7 +212,7 @@ export class ChunkedGraphLayer extends GenericSliceViewRenderLayer {
         timestamp ? `&timestamp=${timestamp}` : ``}`);
 
     const response = await this.withErrorMessage(promise, {
-      initialMessage: `Retrieving all contact partners for ${root}`,
+      initialMessage: `Retrieving all contact partners for ${root} (can take 5-10 minutes)`,
       errorPrefix: `Could not get contact partners: `
     });
 

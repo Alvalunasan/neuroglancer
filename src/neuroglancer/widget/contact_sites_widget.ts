@@ -21,7 +21,7 @@ import {mat4, vec3} from 'gl-matrix';
 import {Point} from '../annotation';
 import {setAnnotationHoverStateFromMouseState} from '../annotation/selection';
 import {SpontaneousAnnotationLayer} from '../annotation/spontaneous_annotation_layer';
-import {ContactSite, PairwiseContactSites} from '../graph/contact_sites';
+import {ContactPartnersForRoot, ContactSite, PairwiseContactSites} from '../graph/contact_sites';
 import {SegmentationUserLayerWithGraph} from '../segmentation_user_layer_with_graph';
 import {StatusMessage} from '../status';
 import {TrackableBoolean, TrackableBooleanCheckbox} from '../trackable_boolean';
@@ -58,8 +58,7 @@ export class PairwiseContactSitesWidget extends RefCounted {
     // Create groups for existing contact site lists
     const pairwiseContactSiteLists = segmentationLayer.contactSites.pairwiseContactSiteLists;
     pairwiseContactSiteLists.forEach(contactSiteList => {
-      const contactSiteGroup = this.createContactSiteGroupElement(contactSiteList, true);
-      this.groupElement.appendFlexibleChild(contactSiteGroup);
+      this.createContactSiteGroupElement(contactSiteList, true);
     });
   }
 
@@ -177,16 +176,15 @@ export class PairwiseContactSitesWidget extends RefCounted {
                     `Contact sites between ${firstSegmentClone.toString()} and ${
                         secondSegmentClone.toString()} retrieved!`,
                     5000);
+                const annotationColor = new TrackableRGB(vec3.fromValues(0.0, 0.0, 0.0));
+                annotationColor.value =
+                    vec3.fromValues(Math.random(), Math.random(), Math.random());
+                const pairwiseContactSiteGroup = new PairwiseContactSites(
+                    firstSegmentClone, secondSegmentClone, contactSites, annotationColor,
+                    contactSitesForPairTitle);
+                segmentationLayer.contactSites.addContactSiteGroup(pairwiseContactSiteGroup);
+                this.createContactSiteGroupElement(pairwiseContactSiteGroup, false);
               }
-              const annotationColor = new TrackableRGB(vec3.fromValues(0.0, 0.0, 0.0));
-              annotationColor.value = vec3.fromValues(Math.random(), Math.random(), Math.random());
-              const pairwiseContactSiteGroup = new PairwiseContactSites(
-                  firstSegmentClone, secondSegmentClone, contactSites, annotationColor,
-                  contactSitesForPairTitle);
-              segmentationLayer.contactSites.addContactSiteGroup(pairwiseContactSiteGroup);
-              const contactSiteGroup =
-                  this.createContactSiteGroupElement(pairwiseContactSiteGroup, false);
-              this.groupElement.appendFixedChild(contactSiteGroup);
             });
       }
     });
@@ -195,8 +193,7 @@ export class PairwiseContactSitesWidget extends RefCounted {
 
   private createContactSiteGroupElement(
       pairwiseContactSiteGroup: PairwiseContactSites, existingGroup: boolean) {
-    const {name: contactSiteGroupName, color: annotationColor, segment1, segment2} =
-        pairwiseContactSiteGroup;
+    const {color: annotationColor, segment1, segment2} = pairwiseContactSiteGroup;
     const {segmentationLayer} = this;
 
     // Create annotation layer
@@ -238,12 +235,12 @@ export class PairwiseContactSitesWidget extends RefCounted {
     deleteGroupButton.style.verticalAlign = 'bottom';
 
     const minimizableGroupForContactSitesPair = new MinimizableGroupWidgetWithHeader(
-        contactSiteGroupName,
+        pairwiseContactSiteGroup.name,
         [showOrHideContactSitesGroupCheckbox.element, colorWidget.element, deleteGroupButton]);
     minimizableGroupForContactSitesPair.element.style.marginLeft = '6%';
     deleteGroupButton.addEventListener('click', () => {
-      const deleteConfirmed =
-          confirm(`Are you sure you want to delete contact sites group ${contactSiteGroupName}?`);
+      const deleteConfirmed = confirm(
+          `Are you sure you want to delete contact sites group ${pairwiseContactSiteGroup.name}?`);
       if (deleteConfirmed) {
         annotationLayerForContactSitesPair.renderLayers.forEach(renderLayer => {
           segmentationLayer.removeRenderLayer(renderLayer);
@@ -283,7 +280,7 @@ export class PairwiseContactSitesWidget extends RefCounted {
       });
     }));
 
-    return minimizableGroupForContactSitesPair.element;
+    this.groupElement.appendFlexibleChild(minimizableGroupForContactSitesPair.element);
   }
 }
 
@@ -313,18 +310,90 @@ export class AllContactSitesForRootWidget extends RefCounted {
       if (!validU64) {
         StatusMessage.showTemporaryMessage(`${addSegmentInput.value} is not a valid uint64`, 4000);
       } else {
-        const rootString = addSegmentInput.value;
+        // const rootString = addSegmentInput.value;
+        const selectedRoot = temp.clone();
+        const contactPartnersGroupName =
+            (contactSiteNameInput.value) ? contactSiteNameInput.value : addSegmentInput.value;
+        addSegmentInput.value = '';
+        contactSiteNameInput.value = '';
         segmentationLayer.chunkedGraphLayer!
-            .getContactPartnersForRoot(temp, segmentationLayer.displayState.timestamp)
-            .then(
-                (contactPartners) => {
-
-                });
+            .getContactPartnersForRoot(selectedRoot, segmentationLayer.displayState.timestamp.value)
+            .then((contactPartners) => {
+              if (contactPartners.size === 0) {
+                StatusMessage.showTemporaryMessage(
+                    `${selectedRoot.toString()} has no contact partners`);
+              } else {
+                StatusMessage.showTemporaryMessage(
+                    `Contact partners of ${selectedRoot.toString()} retrieved!`, 5000);
+                const contactPartnersGroup = new ContactPartnersForRoot(
+                    selectedRoot, contactPartners, contactPartnersGroupName);
+                segmentationLayer.contactSites.addContactSiteGroup(contactPartnersGroup);
+                this.createContactPartnerGroupElement(contactPartnersGroup, false);
+              }
+            });
       }
     });
-    // addSegmentInput.element.style.display = 'inline-block';
-    // const addSegmentElement = document.createElement('div');
-    // addSegmentElement.appendChild(addSegmentLabel);
-    // addSegmentElement.appendChild(addSegmentInput.element);
+    this.groupElement.appendFixedChild(addSegmentLabel);
+    this.groupElement.appendFixedChild(contactSiteNameInputLabel);
+    this.groupElement.appendFixedChild(getContactSitesButton);
+    // Create groups for existing contact partner lists
+    const contactPartnersForRootList = segmentationLayer.contactSites.contactPartnersForRootList;
+    contactPartnersForRootList.forEach(contactPartnersForRoot => {
+      this.createContactPartnerGroupElement(contactPartnersForRoot, true);
+    });
+  }
+
+  private createContactPartnerGroupElement(
+      contactPartners: ContactPartnersForRoot, existingGroup: boolean) {
+    const deleteGroupButton = document.createElement('button');
+    deleteGroupButton.textContent = 'x';
+    deleteGroupButton.style.verticalAlign = 'bottom';
+
+    const minimizableGroupForContactPartners =
+        new MinimizableGroupWidgetWithHeader(contactPartners.name, [deleteGroupButton]);
+    minimizableGroupForContactPartners.element.style.marginLeft = '6%';
+    deleteGroupButton.addEventListener('click', () => {
+      const deleteConfirmed =
+          confirm(`Are you sure you want to delete contact sites group ${contactPartners.name}?`);
+      if (deleteConfirmed) {
+        removeFromParent(minimizableGroupForContactPartners.element);
+      }
+    });
+
+    if (existingGroup) {
+      // Minimize existing groups by default
+      const groupContent = minimizableGroupForContactPartners.element.getElementsByClassName(
+          'neuroglancer-minimizable-group-content');
+      groupContent[0].classList.toggle('minimized');
+      const groupTitle = minimizableGroupForContactPartners.element.getElementsByClassName(
+          'neuroglancer-minimizable-group-title');
+      groupTitle[0].classList.toggle('minimized');
+    }
+
+    const rootSegmentDiv = document.createElement('div');
+    rootSegmentDiv.textContent = `Root segment: ${contactPartners.root.toString()}`;
+    rootSegmentDiv.classList.add('neuroglancer-select-text');
+    minimizableGroupForContactPartners.appendFixedChild(rootSegmentDiv);
+
+    const contactPartnerList = document.createElement('ul');
+
+    for (const [partner, areas] of contactPartners.partners) {
+      const partnerElement = document.createElement('li');
+      partnerElement.textContent = partner.toString();
+      const partnerDetailList = document.createElement('ul');
+      const numberOfContactsElement = document.createElement('li');
+      numberOfContactsElement.textContent = `${areas.length} contact sites`;
+      const areaElement = document.createElement('li');
+      const sumOfAreas = areas.reduce((areaSum, area) => {
+        return areaSum + area;
+      });
+      areaElement.textContent = `Total area across all = ${sumOfAreas} vx`;
+      partnerDetailList.appendChild(numberOfContactsElement);
+      partnerDetailList.appendChild(areaElement);
+      contactPartnerList.appendChild(partnerElement);
+    }
+    minimizableGroupForContactPartners.appendFlexibleChild(contactPartnerList);
+
+    this.groupElement.appendFlexibleChild(minimizableGroupForContactPartners.element);
   }
 }
