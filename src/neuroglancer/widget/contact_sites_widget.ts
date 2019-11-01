@@ -316,6 +316,7 @@ export class AllContactSitesForRootWidget extends RefCounted {
             (contactSiteNameInput.value) ? contactSiteNameInput.value : addSegmentInput.value;
         addSegmentInput.value = '';
         contactSiteNameInput.value = '';
+        contactSiteNameInput.placeholder = '';
         segmentationLayer.chunkedGraphLayer!
             .getContactPartnersForRoot(selectedRoot, segmentationLayer.displayState.timestamp.value)
             .then((contactPartners) => {
@@ -377,7 +378,7 @@ export class AllContactSitesForRootWidget extends RefCounted {
 
     const contactPartnerList = document.createElement('ul');
 
-    for (const [partner, areas] of contactPartners.partners) {
+    for (const [partner, areas] of contactPartners.partners.entries()) {
       const partnerElement = document.createElement('li');
       partnerElement.textContent = partner.toString();
       const partnerDetailList = document.createElement('ul');
@@ -390,6 +391,7 @@ export class AllContactSitesForRootWidget extends RefCounted {
       areaElement.textContent = `Total area across all = ${sumOfAreas} vx`;
       partnerDetailList.appendChild(numberOfContactsElement);
       partnerDetailList.appendChild(areaElement);
+      partnerElement.appendChild(partnerDetailList);
       contactPartnerList.appendChild(partnerElement);
     }
     minimizableGroupForContactPartners.appendFlexibleChild(contactPartnerList);

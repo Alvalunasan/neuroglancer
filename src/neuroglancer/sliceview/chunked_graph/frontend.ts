@@ -208,16 +208,23 @@ export class ChunkedGraphLayer extends GenericSliceViewRenderLayer {
       return Promise.reject(GRAPH_SERVER_NOT_SPECIFIED);
     }
 
-    const promise = authFetch(`${url}/node/${String(root)}/contact_sites?int64_as_str=1&partners=1${
+    const promise = authFetch(`${url}/node/${
+        String(root)}/contact_sites?int64_as_str=1&partners=1&as_list=1&areas_only=1${
         timestamp ? `&timestamp=${timestamp}` : ``}`);
 
     const response = await this.withErrorMessage(promise, {
-      initialMessage: `Retrieving all contact partners for ${root} (can take 5-10 minutes)`,
+      initialMessage: `Retrieving all contact partners for ${root} (can take 3-10 minutes)`,
       errorPrefix: `Could not get contact partners: `
     });
 
     const contactPartnersList = await response.json();
-    return contactPartnersList;
+    const contactPartners = new Map<Uint64, number[]>();
+    for (let i = 0; i < contactPartnersList.length; i++) {
+      const contactPartnerObj = contactPartnersList[i];
+      const partner = Uint64.parseString(contactPartnerObj['segment_id'], 10);
+      contactPartners.set(partner, contactPartnerObj['contact_site_areas']);
+    }
+    return contactPartners;
   }
 
   draw() {}

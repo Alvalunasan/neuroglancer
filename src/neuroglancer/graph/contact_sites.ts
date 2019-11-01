@@ -152,7 +152,7 @@ export class ContactPartnersForRoot extends ContactSiteGroup {
     x[ROOT_JSON_KEY] = this.root.toJSON();
     x[CONTACT_SITES_GROUP_NAME_JSON_KEY] = name;
     const partnersListJSON: any[] = [];
-    for (const [partner, areas] of this.partners) {
+    for (const [partner, areas] of this.partners.entries()) {
       partnersListJSON.push(
           {[PARTNER_ROOT_JSON_KEY]: partner.toJSON(), [AREAS_JSON_KEY]: areas.toString()});
     }
