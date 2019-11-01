@@ -62,11 +62,6 @@ export class ChunkedGraphChunkSource extends SliceViewChunkSource implements
   }
 }
 
-
-// type BoundedContactSiteWithSegment = {
-//   lowerBoundCoordinate: vec3; upperBoundCoordinate: vec3; area: number; segment: Uint64;
-// };
-
 export class ChunkedGraphLayer extends GenericSliceViewRenderLayer {
   private graphurl: string;
   private leafRequestsStatusMessage: StatusMessage|undefined;
@@ -230,31 +225,36 @@ export class ChunkedGraphLayer extends GenericSliceViewRenderLayer {
     return contactSites;
   }
 
-  async getContactPartnersForRoot(root: Uint64, timestamp?: string):
-      Promise<Map<Uint64, number[]>> {
-    const {url} = this;
-    if (url === '') {
-      return Promise.reject(GRAPH_SERVER_NOT_SPECIFIED);
-    }
+  // The below commented out code is for an abandoned feature (Finding all contact partners
+  // that a root has in a dataset). I found that there are simply too many partners for this to be
+  // useful and easy to display in Neuroglancer. Leaving this code in here in case we want to be
+  // pick this up again at some point. - Manuel 11/2019
 
-    const promise = authFetch(`${url}/node/${
-        String(root)}/contact_sites?int64_as_str=1&partners=1&as_list=1&areas_only=1${
-        timestamp ? `&timestamp=${timestamp}` : ``}`);
+  // async getContactPartnersForRoot(root: Uint64, timestamp?: string):
+  //     Promise<Map<Uint64, number[]>> {
+  //   const {url} = this;
+  //   if (url === '') {
+  //     return Promise.reject(GRAPH_SERVER_NOT_SPECIFIED);
+  //   }
 
-    const response = await this.withErrorMessage(promise, {
-      initialMessage: `Retrieving all contact partners for ${root} (can take 3-10 minutes)`,
-      errorPrefix: `Could not get contact partners: `
-    });
+  //   const promise = authFetch(`${url}/node/${
+  //       String(root)}/contact_sites?int64_as_str=1&partners=1&as_list=1&areas_only=1${
+  //       timestamp ? `&timestamp=${timestamp}` : ``}`);
 
-    const contactPartnersList = await response.json();
-    const contactPartners = new Map<Uint64, number[]>();
-    for (let i = 0; i < contactPartnersList.length; i++) {
-      const contactPartnerObj = contactPartnersList[i];
-      const partner = Uint64.parseString(contactPartnerObj['segment_id'], 10);
-      contactPartners.set(partner, contactPartnerObj['contact_site_areas']);
-    }
-    return contactPartners;
-  }
+  //   const response = await this.withErrorMessage(promise, {
+  //     initialMessage: `Retrieving all contact partners for ${root} (can take 3-10 minutes)`,
+  //     errorPrefix: `Could not get contact partners: `
+  //   });
+
+  //   const contactPartnersList = await response.json();
+  //   const contactPartners = new Map<Uint64, number[]>();
+  //   for (let i = 0; i < contactPartnersList.length; i++) {
+  //     const contactPartnerObj = contactPartnersList[i];
+  //     const partner = Uint64.parseString(contactPartnerObj['segment_id'], 10);
+  //     contactPartners.set(partner, contactPartnerObj['contact_site_areas']);
+  //   }
+  //   return contactPartners;
+  // }
 
   draw() {}
 

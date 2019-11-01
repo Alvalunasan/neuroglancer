@@ -19,7 +19,7 @@ import './contact_sites_widget.css';
 import {vec3} from 'gl-matrix';
 import {setAnnotationHoverStateFromMouseState} from 'neuroglancer/annotation/selection';
 import {SpontaneousAnnotationLayer} from 'neuroglancer/annotation/spontaneous_annotation_layer';
-import {ContactPartnersForRoot, PairwiseContactSites} from 'neuroglancer/graph/contact_sites';
+import {PairwiseContactSites} from 'neuroglancer/graph/contact_sites';
 import {SegmentationUserLayerWithGraph} from 'neuroglancer/segmentation_user_layer_with_graph';
 import {StatusMessage} from 'neuroglancer/status';
 import {TrackableBoolean, TrackableBooleanCheckbox} from 'neuroglancer/trackable_boolean';
@@ -33,7 +33,7 @@ import {Uint64EntryWidget} from 'neuroglancer/widget/uint64_entry_widget';
 
 export class PairwiseContactSitesWidget extends RefCounted {
   groupElement = this.registerDisposer(new MinimizableGroupWidget('Contact Sites (for pair)'));
-  private contactSiteGroupIdCounter = 0;
+  private contactSiteGroupIdCounter: number;
   private segment1: Uint64|null = null;
   private segment2: Uint64|null = null;
   private segment1Label = document.createElement('label');
@@ -50,10 +50,11 @@ export class PairwiseContactSitesWidget extends RefCounted {
            annotationLayerForContactSitesPair: SpontaneousAnnotationLayer, firstSegment: Uint64,
            secondSegment: Uint64) => HTMLElement[]) {
     super();
+    const pairwiseContactSiteLists = segmentationLayer.contactSites.pairwiseContactSiteLists;
+    this.contactSiteGroupIdCounter = pairwiseContactSiteLists.length + 1;
     this.createSegmentInputElements();
     this.createGetContactSitesButton();
     // Create groups for existing contact site lists
-    const pairwiseContactSiteLists = segmentationLayer.contactSites.pairwiseContactSiteLists;
     pairwiseContactSiteLists.forEach(contactSiteList => {
       this.createContactSiteGroupElement(contactSiteList, true);
     });
@@ -134,7 +135,7 @@ export class PairwiseContactSitesWidget extends RefCounted {
     const contactSiteNameInputLabel = document.createElement('label');
     contactSiteNameInputLabel.textContent = 'Alias for contact sites: ';
     contactSiteNameInputLabel.appendChild(contactSiteNameInput);
-    contactSiteNameInput.placeholder = 'Contact Sites for Pair #1';
+    contactSiteNameInput.placeholder = `Contact Sites for Pair #${this.contactSiteGroupIdCounter}`;
     this.groupElement.appendFixedChild(addSegmentElement);
     this.groupElement.appendFixedChild(segment1Display);
     this.groupElement.appendFixedChild(segment2Display);
@@ -281,117 +282,124 @@ export class PairwiseContactSitesWidget extends RefCounted {
   }
 }
 
-const temp = new Uint64();
+// The below commented out code is for an abandoned feature (Finding all contact partners
+// that a root has in a dataset). I found that there are simply too many partners for this to be
+// useful and easy to display in Neuroglancer. Leaving this code in here in case we want to be
+// pick this up again at some point. - Manuel 11/2019
 
-export class AllContactSitesForRootWidget extends RefCounted {
-  groupElement =
-      this.registerDisposer(new MinimizableGroupWidget('Contact Sites (for single root)'));
+// const temp = new Uint64();
 
-  constructor(segmentationLayer: SegmentationUserLayerWithGraph) {
-    super();
-    const addSegmentLabel = document.createElement('span');
-    addSegmentLabel.textContent = 'Enter segment ID: ';
-    const addSegmentInput = document.createElement('input');
-    addSegmentLabel.appendChild(addSegmentInput);
-    const contactSiteNameInput = document.createElement('input');
-    const contactSiteNameInputLabel = document.createElement('label');
-    contactSiteNameInputLabel.textContent = 'Alias for contact sites: ';
-    contactSiteNameInputLabel.appendChild(contactSiteNameInput);
-    addSegmentInput.addEventListener('change', () => {
-      contactSiteNameInput.placeholder = addSegmentInput.value;
-    });
-    const getContactSitesButton = document.createElement('button');
-    getContactSitesButton.textContent = 'Get contact sites';
-    getContactSitesButton.addEventListener('click', () => {
-      const validU64 = temp.tryParseString(addSegmentInput.value, 10);
-      if (!validU64) {
-        StatusMessage.showTemporaryMessage(`${addSegmentInput.value} is not a valid uint64`, 4000);
-      } else {
-        // const rootString = addSegmentInput.value;
-        const selectedRoot = temp.clone();
-        const contactPartnersGroupName =
-            (contactSiteNameInput.value) ? contactSiteNameInput.value : addSegmentInput.value;
-        addSegmentInput.value = '';
-        contactSiteNameInput.value = '';
-        contactSiteNameInput.placeholder = '';
-        segmentationLayer.chunkedGraphLayer!
-            .getContactPartnersForRoot(selectedRoot, segmentationLayer.displayState.timestamp.value)
-            .then((contactPartners) => {
-              if (contactPartners.size === 0) {
-                StatusMessage.showTemporaryMessage(
-                    `${selectedRoot.toString()} has no contact partners`);
-              } else {
-                StatusMessage.showTemporaryMessage(
-                    `Contact partners of ${selectedRoot.toString()} retrieved!`, 5000);
-                const contactPartnersGroup = new ContactPartnersForRoot(
-                    selectedRoot, contactPartners, contactPartnersGroupName);
-                segmentationLayer.contactSites.addContactSiteGroup(contactPartnersGroup);
-                this.createContactPartnerGroupElement(contactPartnersGroup, false);
-              }
-            });
-      }
-    });
-    this.groupElement.appendFixedChild(addSegmentLabel);
-    this.groupElement.appendFixedChild(contactSiteNameInputLabel);
-    this.groupElement.appendFixedChild(getContactSitesButton);
-    // Create groups for existing contact partner lists
-    const contactPartnersForRootList = segmentationLayer.contactSites.contactPartnersForRootList;
-    contactPartnersForRootList.forEach(contactPartnersForRoot => {
-      this.createContactPartnerGroupElement(contactPartnersForRoot, true);
-    });
-  }
+// export class AllContactSitesForRootWidget extends RefCounted {
+//   groupElement =
+//       this.registerDisposer(new MinimizableGroupWidget('Contact Sites (for single root)'));
 
-  private createContactPartnerGroupElement(
-      contactPartners: ContactPartnersForRoot, existingGroup: boolean) {
-    const deleteGroupButton = document.createElement('button');
-    deleteGroupButton.textContent = 'x';
-    deleteGroupButton.style.verticalAlign = 'bottom';
+//   constructor(segmentationLayer: SegmentationUserLayerWithGraph) {
+//     super();
+//     const addSegmentLabel = document.createElement('span');
+//     addSegmentLabel.textContent = 'Enter segment ID: ';
+//     const addSegmentInput = document.createElement('input');
+//     addSegmentLabel.appendChild(addSegmentInput);
+//     const contactSiteNameInput = document.createElement('input');
+//     const contactSiteNameInputLabel = document.createElement('label');
+//     contactSiteNameInputLabel.textContent = 'Alias for contact sites: ';
+//     contactSiteNameInputLabel.appendChild(contactSiteNameInput);
+//     addSegmentInput.addEventListener('change', () => {
+//       contactSiteNameInput.placeholder = addSegmentInput.value;
+//     });
+//     const getContactSitesButton = document.createElement('button');
+//     getContactSitesButton.textContent = 'Get contact sites';
+//     getContactSitesButton.addEventListener('click', () => {
+//       const validU64 = temp.tryParseString(addSegmentInput.value, 10);
+//       if (!validU64) {
+//         StatusMessage.showTemporaryMessage(`${addSegmentInput.value} is not a valid uint64`,
+//         4000);
+//       } else {
+//         // const rootString = addSegmentInput.value;
+//         const selectedRoot = temp.clone();
+//         const contactPartnersGroupName =
+//             (contactSiteNameInput.value) ? contactSiteNameInput.value : addSegmentInput.value;
+//         addSegmentInput.value = '';
+//         contactSiteNameInput.value = '';
+//         contactSiteNameInput.placeholder = '';
+//         segmentationLayer.chunkedGraphLayer!
+//             .getContactPartnersForRoot(selectedRoot,
+//             segmentationLayer.displayState.timestamp.value) .then((contactPartners) => {
+//               if (contactPartners.size === 0) {
+//                 StatusMessage.showTemporaryMessage(
+//                     `${selectedRoot.toString()} has no contact partners`);
+//               } else {
+//                 StatusMessage.showTemporaryMessage(
+//                     `Contact partners of ${selectedRoot.toString()} retrieved!`, 5000);
+//                 const contactPartnersGroup = new ContactPartnersForRoot(
+//                     selectedRoot, contactPartners, contactPartnersGroupName);
+//                 segmentationLayer.contactSites.addContactSiteGroup(contactPartnersGroup);
+//                 this.createContactPartnerGroupElement(contactPartnersGroup, false);
+//               }
+//             });
+//       }
+//     });
+//     this.groupElement.appendFixedChild(addSegmentLabel);
+//     this.groupElement.appendFixedChild(contactSiteNameInputLabel);
+//     this.groupElement.appendFixedChild(getContactSitesButton);
+//     // Create groups for existing contact partner lists
+//     const contactPartnersForRootList = segmentationLayer.contactSites.contactPartnersForRootList;
+//     contactPartnersForRootList.forEach(contactPartnersForRoot => {
+//       this.createContactPartnerGroupElement(contactPartnersForRoot, true);
+//     });
+//   }
 
-    const minimizableGroupForContactPartners =
-        new MinimizableGroupWidgetWithHeader(contactPartners.name, [deleteGroupButton]);
-    minimizableGroupForContactPartners.element.style.marginLeft = '6%';
-    deleteGroupButton.addEventListener('click', () => {
-      const deleteConfirmed =
-          confirm(`Are you sure you want to delete contact sites group ${contactPartners.name}?`);
-      if (deleteConfirmed) {
-        removeFromParent(minimizableGroupForContactPartners.element);
-      }
-    });
+//   private createContactPartnerGroupElement(
+//       contactPartners: ContactPartnersForRoot, existingGroup: boolean) {
+//     const deleteGroupButton = document.createElement('button');
+//     deleteGroupButton.textContent = 'x';
+//     deleteGroupButton.style.verticalAlign = 'bottom';
 
-    if (existingGroup) {
-      // Minimize existing groups by default
-      const groupContent = minimizableGroupForContactPartners.element.getElementsByClassName(
-          'neuroglancer-minimizable-group-content');
-      groupContent[0].classList.toggle('minimized');
-      const groupTitle = minimizableGroupForContactPartners.element.getElementsByClassName(
-          'neuroglancer-minimizable-group-title');
-      groupTitle[0].classList.toggle('minimized');
-    }
+//     const minimizableGroupForContactPartners =
+//         new MinimizableGroupWidgetWithHeader(contactPartners.name, [deleteGroupButton]);
+//     minimizableGroupForContactPartners.element.style.marginLeft = '6%';
+//     deleteGroupButton.addEventListener('click', () => {
+//       const deleteConfirmed =
+//           confirm(`Are you sure you want to delete contact sites group
+//           ${contactPartners.name}?`);
+//       if (deleteConfirmed) {
+//         removeFromParent(minimizableGroupForContactPartners.element);
+//       }
+//     });
 
-    const rootSegmentDiv = document.createElement('div');
-    rootSegmentDiv.textContent = `Root segment: ${contactPartners.root.toString()}`;
-    rootSegmentDiv.classList.add('neuroglancer-select-text');
-    minimizableGroupForContactPartners.appendFixedChild(rootSegmentDiv);
+//     if (existingGroup) {
+//       // Minimize existing groups by default
+//       const groupContent = minimizableGroupForContactPartners.element.getElementsByClassName(
+//           'neuroglancer-minimizable-group-content');
+//       groupContent[0].classList.toggle('minimized');
+//       const groupTitle = minimizableGroupForContactPartners.element.getElementsByClassName(
+//           'neuroglancer-minimizable-group-title');
+//       groupTitle[0].classList.toggle('minimized');
+//     }
 
-    const contactPartnerList = document.createElement('ul');
-    for (const [partner, areas] of contactPartners.partners.entries()) {
-      const partnerElement = document.createElement('li');
-      partnerElement.textContent = partner.toString();
-      const partnerDetailList = document.createElement('ul');
-      const numberOfContactsElement = document.createElement('li');
-      numberOfContactsElement.textContent = `${areas.length} contact sites`;
-      const areaElement = document.createElement('li');
-      const sumOfAreas = areas.reduce((areaSum, area) => {
-        return areaSum + area;
-      });
-      areaElement.textContent = `Total area across all = ${sumOfAreas} vx`;
-      partnerDetailList.appendChild(numberOfContactsElement);
-      partnerDetailList.appendChild(areaElement);
-      partnerElement.appendChild(partnerDetailList);
-      contactPartnerList.appendChild(partnerElement);
-    }
-    minimizableGroupForContactPartners.appendFlexibleChild(contactPartnerList);
+//     const rootSegmentDiv = document.createElement('div');
+//     rootSegmentDiv.textContent = `Root segment: ${contactPartners.root.toString()}`;
+//     rootSegmentDiv.classList.add('neuroglancer-select-text');
+//     minimizableGroupForContactPartners.appendFixedChild(rootSegmentDiv);
 
-    this.groupElement.appendFlexibleChild(minimizableGroupForContactPartners.element);
-  }
-}
+//     const contactPartnerList = document.createElement('ul');
+//     for (const [partner, areas] of contactPartners.partners.entries()) {
+//       const partnerElement = document.createElement('li');
+//       partnerElement.textContent = partner.toString();
+//       const partnerDetailList = document.createElement('ul');
+//       const numberOfContactsElement = document.createElement('li');
+//       numberOfContactsElement.textContent = `${areas.length} contact sites`;
+//       const areaElement = document.createElement('li');
+//       const sumOfAreas = areas.reduce((areaSum, area) => {
+//         return areaSum + area;
+//       });
+//       areaElement.textContent = `Total area across all = ${sumOfAreas} vx`;
+//       partnerDetailList.appendChild(numberOfContactsElement);
+//       partnerDetailList.appendChild(areaElement);
+//       partnerElement.appendChild(partnerDetailList);
+//       contactPartnerList.appendChild(partnerElement);
+//     }
+//     minimizableGroupForContactPartners.appendFlexibleChild(contactPartnerList);
+
+//     this.groupElement.appendFlexibleChild(minimizableGroupForContactPartners.element);
+//   }
+// }

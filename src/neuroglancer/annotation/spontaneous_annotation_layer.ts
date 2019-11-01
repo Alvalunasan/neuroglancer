@@ -15,18 +15,16 @@
  */
 
 import {vec3} from 'gl-matrix';
-
-import {ChunkManager} from '../chunk_manager/frontend';
-import {CoordinateTransform} from '../coordinate_transform';
-import {TrackableAlphaValue, trackableAlphaValue} from '../trackable_alpha';
-import {TrackableRGB} from '../util/color';
-import {Owned, RefCounted} from '../util/disposable';
-
-import {Annotation, AnnotationSource, LocalAnnotationSource} from '.';
-import {AnnotationLayerState} from './annotation_layer_state';
-import {MultiscaleAnnotationSource, SliceViewAnnotationLayer} from './frontend';
-import {AnnotationLayer, PerspectiveViewAnnotationLayer} from './renderlayer';
-import { RenderLayer } from '../layer';
+import {LocalAnnotationSource} from 'neuroglancer/annotation';
+import {AnnotationLayerState} from 'neuroglancer/annotation/annotation_layer_state';
+import {SliceViewAnnotationLayer} from 'neuroglancer/annotation/frontend';
+import {AnnotationLayer, PerspectiveViewAnnotationLayer} from 'neuroglancer/annotation/renderlayer';
+import {ChunkManager} from 'neuroglancer/chunk_manager/frontend';
+import {CoordinateTransform} from 'neuroglancer/coordinate_transform';
+import {RenderLayer} from 'neuroglancer/layer';
+import {trackableAlphaValue} from 'neuroglancer/trackable_alpha';
+import {TrackableRGB} from 'neuroglancer/util/color';
+import {RefCounted} from 'neuroglancer/util/disposable';
 
 
 /**
@@ -37,10 +35,6 @@ export class SpontaneousAnnotationLayer extends RefCounted {
   annotationLayer: AnnotationLayer;
   annotationLayerState: AnnotationLayerState;
   renderLayers: RenderLayer[];
-  // sliceViewRenderLayer: AnnotationRenderLayer<typeof AnnotationSliceViewRenderLayerBase>.C&
-  //     AnnotationSliceViewRenderLayerBase;
-  // sliceViewRenderLayer =
-  // sliceViewRenderLayer;
 
   constructor(
       chunkManager: ChunkManager,
@@ -50,10 +44,13 @@ export class SpontaneousAnnotationLayer extends RefCounted {
   ) {
     super();
     const source = this.source = this.registerDisposer(new LocalAnnotationSource());
-    this.annotationLayerState = this.registerDisposer(new AnnotationLayerState({transform, source, color, fillOpacity}));
-    this.annotationLayer = this.registerDisposer(new AnnotationLayer(chunkManager, this.annotationLayerState));
+    this.annotationLayerState =
+        this.registerDisposer(new AnnotationLayerState({transform, source, color, fillOpacity}));
+    this.annotationLayer =
+        this.registerDisposer(new AnnotationLayer(chunkManager, this.annotationLayerState));
     const sliceViewRenderLayer = new SliceViewAnnotationLayer(this.annotationLayer);
-    const perspectiveViewAnnotationLayer = new PerspectiveViewAnnotationLayer(this.annotationLayer.addRef());
+    const perspectiveViewAnnotationLayer =
+        new PerspectiveViewAnnotationLayer(this.annotationLayer.addRef());
     this.renderLayers = [sliceViewRenderLayer, perspectiveViewAnnotationLayer];
   }
 }

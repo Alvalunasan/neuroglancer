@@ -48,7 +48,7 @@ import {formatIntegerPoint} from 'neuroglancer/util/spatial_units';
 import {Uint64} from 'neuroglancer/util/uint64';
 import {WatchableVisibilityPriority} from 'neuroglancer/visibility_priority/frontend';
 import {makeCloseButton} from 'neuroglancer/widget/close_button';
-import {AllContactSitesForRootWidget, PairwiseContactSitesWidget} from 'neuroglancer/widget/contact_sites_widget';
+import {PairwiseContactSitesWidget} from 'neuroglancer/widget/contact_sites_widget';
 import {MinimizableGroupWidget, MinimizableGroupWidgetWithHeader} from 'neuroglancer/widget/minimizable_group';
 import {RangeWidget} from 'neuroglancer/widget/range';
 import {StackView, Tab} from 'neuroglancer/widget/tab_view';
@@ -289,10 +289,6 @@ export class GraphOperationLayerView extends Tab {
   multicutGroup = this.registerDisposer(new MinimizableGroupWidget('Multicut'));
   multicutOpacityGroup = this.registerDisposer(new MinimizableGroupWidget('Multicut Opacity'));
   timectrlGroup = this.registerDisposer(new MinimizableGroupWidget('Time Control'));
-  // contactSitesPairwiseGroup =
-  //     this.registerDisposer(new MinimizableGroupWidget('Contact Sites (for pair)'));
-  // contactSitesSingleRootGroup =
-  //     this.registerDisposer(new MinimizableGroupWidget('Contact Sites (for single root)'));
   timeWidget: TimeSegmentWidget|undefined;
 
   constructor(
@@ -449,62 +445,7 @@ export class GraphOperationLayerView extends Tab {
 
     const pairwiseContactSitesWidget = this.registerDisposer(
         new PairwiseContactSitesWidget(this.wrapper, this.addPointsFromContactSites.bind(this)));
-    const contactSitesForRootWidget =
-        this.registerDisposer(new AllContactSitesForRootWidget(this.wrapper));
-    // this.contactSitesPairwiseGroup.appendFlexibleChild(pairwiseContactSitesWidget.element);
     this.element.appendChild(pairwiseContactSitesWidget.groupElement.element);
-    this.element.appendChild(contactSitesForRootWidget.groupElement.element);
-    // this.element.appendChild()
-  }
-
-  // groupWidget: MinimizableGroupWidgetWithHeader,
-  private addRandomPoints(
-      pairwiseContactSiteGroup: PairwiseContactSites,
-      minimizableGroupForContactSitesPair: MinimizableGroupWidgetWithHeader,
-      annotationLayerForContactSitesPair: SpontaneousAnnotationLayer, firstSegment: Uint64,
-      secondSegment: Uint64): HTMLElement[] {
-    const annotationList = document.createElement('ul');
-    const elementsList: HTMLElement[] = [];
-    for (let i = 0; i < 10; i++) {
-      let randomNum1 = Math.random() * 1000;
-      let randomNum2 = Math.random() * 1000;
-      let randomNum3 = Math.random() * 1000;
-      let randomNum4 = Math.random() * 100;
-      const contactSitePoint: Point = {
-        id: '',
-        segments: [firstSegment, secondSegment],
-        description: `Area = ${randomNum4}`,
-        point: vec3.fromValues(
-            (169000 + randomNum1) * 4, (67500 + randomNum2) * 4, (4200 + randomNum3) * 40),
-        type: AnnotationType.POINT
-      };
-      pairwiseContactSiteGroup.contactSites.push(
-          {coordinate: contactSitePoint.point, area: randomNum4});
-      annotationLayerForContactSitesPair.source.add(contactSitePoint);
-      const element = this.makeAnnotationListElement(
-          contactSitePoint, annotationLayerForContactSitesPair.transform.transform,
-          annotationLayerForContactSitesPair.color.toString(), false);
-      element.addEventListener('mouseenter', () => {
-        this.annotationLayer.hoverState.value = {id: contactSitePoint.id};
-      });
-      element.addEventListener('click', () => {
-        this.state.value = {id: contactSitePoint.id};
-      });
-      element.addEventListener('mouseup', (event: MouseEvent) => {
-        if (event.button === 2) {
-          this.setSpatialCoordinates(
-              getCenterPosition(contactSitePoint, this.annotationLayer.objectToGlobal));
-        }
-      });
-      const description = document.createElement('div');
-      description.className = 'neuroglancer-annotation-description';
-      description.textContent = `Area = ${randomNum4}`;
-      element.appendChild(description);
-      annotationList.appendChild(element);
-      elementsList.push(element);
-    }
-    minimizableGroupForContactSitesPair.appendFixedChild(annotationList);
-    return elementsList;
   }
 
   private addPointsFromContactSites(
