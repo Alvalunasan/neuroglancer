@@ -23,7 +23,9 @@ import './annotations.css';
 import './graph.css';
 
 import debounce from 'lodash/debounce';
-import {Annotation, AnnotationReference, AnnotationType, getAnnotationTypeHandler, LocalAnnotationSource, Point} from 'neuroglancer/annotation';
+import {Annotation, AnnotationReference, AnnotationType, getAnnotationTypeHandler, Point} from 'neuroglancer/annotation';
+import {SpontaneousAnnotationLayer} from 'neuroglancer/annotation/spontaneous_annotation_layer';
+import {PairwiseContactSites} from 'neuroglancer/graph/contact_sites';
 import {GraphOperationLayerState} from 'neuroglancer/graph/graph_operation_layer_state';
 import {MouseSelectionState} from 'neuroglancer/layer';
 import {VoxelSize} from 'neuroglancer/navigation_state';
@@ -38,7 +40,7 @@ import {Tool} from 'neuroglancer/ui/tool';
 import {Uint64Set} from 'neuroglancer/uint64_set';
 import {TrackableRGB} from 'neuroglancer/util/color';
 import {Borrowed, Owned, RefCounted} from 'neuroglancer/util/disposable';
-import {removeChildren, removeFromParent} from 'neuroglancer/util/dom';
+import {removeChildren} from 'neuroglancer/util/dom';
 import {mat4, vec3} from 'neuroglancer/util/geom';
 import {verifyObjectProperty, verifyOptionalString, verifyString} from 'neuroglancer/util/json';
 import {NullarySignal} from 'neuroglancer/util/signal';
@@ -46,20 +48,12 @@ import {formatIntegerPoint} from 'neuroglancer/util/spatial_units';
 import {Uint64} from 'neuroglancer/util/uint64';
 import {WatchableVisibilityPriority} from 'neuroglancer/visibility_priority/frontend';
 import {makeCloseButton} from 'neuroglancer/widget/close_button';
-import {RangeWidget} from 'neuroglancer/widget/range';
+import {AllContactSitesForRootWidget, PairwiseContactSitesWidget} from 'neuroglancer/widget/contact_sites_widget';
 import {MinimizableGroupWidget, MinimizableGroupWidgetWithHeader} from 'neuroglancer/widget/minimizable_group';
+import {RangeWidget} from 'neuroglancer/widget/range';
 import {StackView, Tab} from 'neuroglancer/widget/tab_view';
 import {makeTextIconButton} from 'neuroglancer/widget/text_icon_button';
 import {TimeSegmentWidget} from 'neuroglancer/widget/time_segment_widget';
-
-import {setAnnotationHoverStateFromMouseState} from '../annotation/selection';
-import {SpontaneousAnnotationLayer} from '../annotation/spontaneous_annotation_layer';
-import {PairwiseContactSites} from '../graph/contact_sites';
-import {TrackableBoolean, TrackableBooleanCheckbox} from '../trackable_boolean';
-import {TrackableRGB} from '../util/color';
-import {ColorWidget} from '../widget/color';
-import {PairwiseContactSitesWidget, AllContactSitesForRootWidget} from '../widget/contact_sites_widget';
-import {Uint64EntryWidget} from '../widget/uint64_entry_widget';
 
 type GraphOperationMarkerId = {
   id: string,
@@ -455,7 +449,8 @@ export class GraphOperationLayerView extends Tab {
 
     const pairwiseContactSitesWidget = this.registerDisposer(
         new PairwiseContactSitesWidget(this.wrapper, this.addPointsFromContactSites.bind(this)));
-    const contactSitesForRootWidget = this.registerDisposer(new AllContactSitesForRootWidget(this.wrapper));
+    const contactSitesForRootWidget =
+        this.registerDisposer(new AllContactSitesForRootWidget(this.wrapper));
     // this.contactSitesPairwiseGroup.appendFlexibleChild(pairwiseContactSitesWidget.element);
     this.element.appendChild(pairwiseContactSitesWidget.groupElement.element);
     this.element.appendChild(contactSitesForRootWidget.groupElement.element);
@@ -790,7 +785,8 @@ class SplitPreview extends RefCounted {
                   });
             } else {
               StatusMessage.showTemporaryMessage(
-                  'You must select at least one source and one sink to perform a split preview.', 5000);
+                  'You must select at least one source and one sink to perform a split preview.',
+                  5000);
             }
           }
         }

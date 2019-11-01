@@ -88,7 +88,6 @@ export class MinimizableGroupWidgetWithHeader extends RefCounted {
     content.className = 'neuroglancer-minimizable-group-content';
     element.className = 'neuroglancer-minimizable-group';
     element.appendChild(header);
-    // element.appendChild(label);
     element.appendChild(content);
   }
 

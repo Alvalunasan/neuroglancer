@@ -16,23 +16,20 @@
 
 import './contact_sites_widget.css';
 
-import {mat4, vec3} from 'gl-matrix';
-
-import {Point} from '../annotation';
-import {setAnnotationHoverStateFromMouseState} from '../annotation/selection';
-import {SpontaneousAnnotationLayer} from '../annotation/spontaneous_annotation_layer';
-import {ContactPartnersForRoot, ContactSite, PairwiseContactSites} from '../graph/contact_sites';
-import {SegmentationUserLayerWithGraph} from '../segmentation_user_layer_with_graph';
-import {StatusMessage} from '../status';
-import {TrackableBoolean, TrackableBooleanCheckbox} from '../trackable_boolean';
-import {TrackableRGB} from '../util/color';
-import {RefCounted} from '../util/disposable';
-import {removeFromParent} from '../util/dom';
-import {Uint64} from '../util/uint64';
-
-import {ColorWidget} from './color';
-import {MinimizableGroupWidget, MinimizableGroupWidgetWithHeader} from './minimizable_group';
-import {Uint64EntryWidget} from './uint64_entry_widget';
+import {vec3} from 'gl-matrix';
+import {setAnnotationHoverStateFromMouseState} from 'neuroglancer/annotation/selection';
+import {SpontaneousAnnotationLayer} from 'neuroglancer/annotation/spontaneous_annotation_layer';
+import {ContactPartnersForRoot, PairwiseContactSites} from 'neuroglancer/graph/contact_sites';
+import {SegmentationUserLayerWithGraph} from 'neuroglancer/segmentation_user_layer_with_graph';
+import {StatusMessage} from 'neuroglancer/status';
+import {TrackableBoolean, TrackableBooleanCheckbox} from 'neuroglancer/trackable_boolean';
+import {TrackableRGB} from 'neuroglancer/util/color';
+import {RefCounted} from 'neuroglancer/util/disposable';
+import {removeFromParent} from 'neuroglancer/util/dom';
+import {Uint64} from 'neuroglancer/util/uint64';
+import {ColorWidget} from 'neuroglancer/widget/color';
+import {MinimizableGroupWidget, MinimizableGroupWidgetWithHeader} from 'neuroglancer/widget/minimizable_group';
+import {Uint64EntryWidget} from 'neuroglancer/widget/uint64_entry_widget';
 
 export class PairwiseContactSitesWidget extends RefCounted {
   groupElement = this.registerDisposer(new MinimizableGroupWidget('Contact Sites (for pair)'));
@@ -290,7 +287,7 @@ export class AllContactSitesForRootWidget extends RefCounted {
   groupElement =
       this.registerDisposer(new MinimizableGroupWidget('Contact Sites (for single root)'));
 
-  constructor(private segmentationLayer: SegmentationUserLayerWithGraph) {
+  constructor(segmentationLayer: SegmentationUserLayerWithGraph) {
     super();
     const addSegmentLabel = document.createElement('span');
     addSegmentLabel.textContent = 'Enter segment ID: ';
@@ -377,7 +374,6 @@ export class AllContactSitesForRootWidget extends RefCounted {
     minimizableGroupForContactPartners.appendFixedChild(rootSegmentDiv);
 
     const contactPartnerList = document.createElement('ul');
-
     for (const [partner, areas] of contactPartners.partners.entries()) {
       const partnerElement = document.createElement('li');
       partnerElement.textContent = partner.toString();

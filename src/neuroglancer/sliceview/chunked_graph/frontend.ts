@@ -201,6 +201,35 @@ export class ChunkedGraphLayer extends GenericSliceViewRenderLayer {
     return {supervoxelConnectedComponents, isSplitIllegal: jsonResp[jsonIllegalSplitKey]};
   }
 
+  async getContactSitesForPair(firstSegment: Uint64, secondSegment: Uint64, timestamp?: string):
+      Promise<ContactSite[]> {
+    const {url} = this;
+    if (url === '') {
+      return Promise.reject(GRAPH_SERVER_NOT_SPECIFIED);
+    }
+
+    const promise = authFetch(`${url}/node/contact_sites_pair/${String(firstSegment)}/${
+        String(secondSegment)}?int64_as_str=1&exact_location=1${
+        timestamp ? `&timestamp=${timestamp}` : ``}`);
+
+    const response = await this.withErrorMessage(promise, {
+      initialMessage: `Retrieving exact contact sites for segments ${firstSegment} and ${
+          secondSegment} (can take 1-3 minutes)`,
+      errorPrefix: `Could not get contact sites: `
+    });
+
+    const contactSitesList = await response.json();
+    const contactSites: ContactSite[] = [];
+    for (let i = 0; i < contactSitesList.length; i++) {
+      const coordinateList = (contactSitesList[i][0]).map((x: any) => parseInt(x, 10));
+      const coordinate = vec3.fromValues(coordinateList[0], coordinateList[1], coordinateList[2]);
+      const area = contactSitesList[i][1];
+      const contactSite: ContactSite = {coordinate, area};
+      contactSites.push(contactSite);
+    }
+    return contactSites;
+  }
+
   async getContactPartnersForRoot(root: Uint64, timestamp?: string):
       Promise<Map<Uint64, number[]>> {
     const {url} = this;

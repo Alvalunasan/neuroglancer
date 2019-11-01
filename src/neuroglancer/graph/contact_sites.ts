@@ -15,13 +15,11 @@
  */
 
 import {vec3} from 'gl-matrix';
-
-import {LocalAnnotationSource} from '../annotation';
-import {TrackableRGB} from '../util/color';
-import {Disposer, RefCounted} from '../util/disposable';
-import {verify3dVec, verifyArray, verifyString} from '../util/json';
-import {NullarySignal} from '../util/signal';
-import {Uint64} from '../util/uint64';
+import {TrackableRGB} from 'neuroglancer/util/color';
+import {Disposer, RefCounted} from 'neuroglancer/util/disposable';
+import {verify3dVec, verifyArray, verifyString} from 'neuroglancer/util/json';
+import {NullarySignal} from 'neuroglancer/util/signal';
+import {Uint64} from 'neuroglancer/util/uint64';
 
 export type ContactSite = {
   coordinate: vec3; area: number;
@@ -115,21 +113,6 @@ export class ContactPartnersForRoot extends ContactSiteGroup {
     super(name);
   }
 
-  // restoreState(specification: any) {
-  //   this._name = verifyString(specification[CONTACT_SITES_GROUP_NAME_JSON_KEY]);
-  //   this.root = Uint64.parseString(specification[ROOT_JSON_KEY], 10);
-  //   const partnersSpec = specification[PARTNERS_JSON_KEY];
-  //   if (partnersSpec) {
-  //     verifyArray(partnersSpec);
-  //     partnersSpec.forEach((partnerSpec: any) => {
-  //       const partnerId = Uint64.parseString(partnerSpec[PARTNER_ROOT_JSON_KEY], 10);
-  //       const contactSiteAreas = partnerSpec[AREAS_JSON_KEY];
-  //       verifyArray(contactSiteAreas);
-  //       this.partners.set(partnerId, contactSiteAreas);
-  //     });
-  //   }
-  // }
-
   static fromSpecification(specification: any) {
     const name = verifyString(specification[CONTACT_SITES_GROUP_NAME_JSON_KEY]);
     const root = Uint64.parseString(specification[ROOT_JSON_KEY], 10);
@@ -165,21 +148,14 @@ const PAIRWISE_CONTACT_SITES_JSON_KEY = 'pairwiseContactSites';
 const CONTACT_PARTNERS_FOR_ROOT_JSON_KEY = 'contactPartnersForRoot';
 const SELECTED_SEGMENT1_JSON_KEY = 'selectedSegment1';
 const SELECTED_SEGMENT2_JSON_KEY = 'selectedSegment2';
-const SELECT_ROOT_SEGMENT_JSON_KEY = 'selectedRoot';
 
 export class ContactSites extends RefCounted {
   pairwiseContactSiteLists: PairwiseContactSites[] = [];
   contactPartnersForRootList: ContactPartnersForRoot[] = [];
   selectedSegment1?: Uint64;
   selectedSegment2?: Uint64;
-  selectedRoot?: Uint64;
   changed = this.registerDisposer(new NullarySignal());
   private disposerMap = new Map<ContactSiteGroup, Disposer>();
-
-  // constructor() {
-  //   super();
-
-  // }
 
   addContactSiteGroup(contactSiteGroup: ContactSiteGroup) {
     if (contactSiteGroup instanceof PairwiseContactSites) {
@@ -188,12 +164,14 @@ export class ContactSites extends RefCounted {
       const signalDisposer = contactSiteGroup.changed.add(this.changed.dispatch);
       this.disposerMap.set(contactSiteGroup, signalDisposer);
       this.registerDisposer(signalDisposer);
+      this.changed.dispatch();
     } else if (contactSiteGroup instanceof ContactPartnersForRoot) {
       this.contactPartnersForRootList.push(contactSiteGroup);
       this.registerDisposer(contactSiteGroup);
       const signalDisposer = contactSiteGroup.changed.add(this.changed.dispatch);
       this.disposerMap.set(contactSiteGroup, signalDisposer);
       this.registerDisposer(signalDisposer);
+      this.changed.dispatch();
     } else {
       // Should never happen
       throw Error('Invalid Contact Site class type');
@@ -253,10 +231,6 @@ export class ContactSites extends RefCounted {
     if (selectedSegment2 !== undefined) {
       this.selectedSegment2 = Uint64.parseString(String(selectedSegment2), 10);
     }
-    const selectedRoot = specification[SELECT_ROOT_SEGMENT_JSON_KEY];
-    if (selectedRoot !== undefined) {
-      this.selectedRoot = Uint64.parseString(String(selectedRoot), 10);
-    }
   }
 
   toJSON() {
@@ -276,9 +250,6 @@ export class ContactSites extends RefCounted {
     }
     if (this.selectedSegment2) {
       x[SELECTED_SEGMENT2_JSON_KEY] = this.selectedSegment2.toJSON();
-    }
-    if (this.selectedRoot) {
-      x[SELECT_ROOT_SEGMENT_JSON_KEY] = this.selectedRoot.toJSON();
     }
     return x;
   }

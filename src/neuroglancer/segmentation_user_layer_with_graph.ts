@@ -14,9 +14,11 @@
  * limitations under the License.
  */
 
-import {AnnotationLayer, SliceViewAnnotationLayer, AnnotationLayerState} from 'neuroglancer/annotation/frontend';
+import {LocalAnnotationSource} from 'neuroglancer/annotation';
+import {AnnotationLayer, SliceViewAnnotationLayer} from 'neuroglancer/annotation/frontend';
 import {PerspectiveViewAnnotationLayer} from 'neuroglancer/annotation/renderlayer';
 import {setAnnotationHoverStateFromMouseState} from 'neuroglancer/annotation/selection';
+import {ContactSites} from 'neuroglancer/graph/contact_sites';
 import {GraphOperationLayerState} from 'neuroglancer/graph/graph_operation_layer_state';
 import {registerLayerType, registerVolumeLayerType} from 'neuroglancer/layer_specification';
 import {SegmentationDisplayState} from 'neuroglancer/segmentation_display_state/frontend';
@@ -35,11 +37,8 @@ import {TrackableRGB} from 'neuroglancer/util/color';
 import {Borrowed, RefCounted} from 'neuroglancer/util/disposable';
 import {vec3} from 'neuroglancer/util/geom';
 import {parseArray, verifyObjectProperty} from 'neuroglancer/util/json';
+import {NullarySignal} from 'neuroglancer/util/signal';
 import {Uint64} from 'neuroglancer/util/uint64';
-import {NullarySignal} from './util/signal';
-import { LocalAnnotationSource } from './annotation';
-import { VoxelSize } from './navigation_state';
-import { ContactSites } from './graph/contact_sites';
 
 // Already defined in segmentation_user_layer.ts
 const EQUIVALENCES_JSON_KEY = 'equivalences';
@@ -151,8 +150,9 @@ function helper<TBase extends BaseConstructor>(Base: TBase) {
       {
         this.registerDisposer(this.contactSites.changed.add(this.specificationChanged.dispatch));
         // this.manager.voxelSize
-        // const contactPointsAnnotationSource = this.contactPointsAnnotationSource = new LocalAnnotationSource();
-        // const contactPointsAnnotationLayerState = new AnnotationLayerState({
+        // const contactPointsAnnotationSource = this.contactPointsAnnotationSource = new
+        // LocalAnnotationSource(); const contactPointsAnnotationLayerState = new
+        // AnnotationLayerState({
         //   transform: this.transform,
         //   source: contactPointsAnnotationSource,
         //   fillOpacity: trackableAlphaValue(1.0),
@@ -164,7 +164,8 @@ function helper<TBase extends BaseConstructor>(Base: TBase) {
         //     contactPointsAnnotationLayerState,
         //     this.manager.layerSelectedValues.mouseState);
         // this.addRenderLayer(new SliceViewAnnotationLayer(contactPointsAnnotationLayer));
-        // this.addRenderLayer(new PerspectiveViewAnnotationLayer(contactPointsAnnotationLayer.addRef()));
+        // this.addRenderLayer(new
+        // PerspectiveViewAnnotationLayer(contactPointsAnnotationLayer.addRef()));
         // this.registerDisposer(this.pathFinderState.changed.add(this.specificationChanged.dispatch));
       }
 
