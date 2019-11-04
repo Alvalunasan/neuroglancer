@@ -184,6 +184,7 @@ export class ContactSites extends RefCounted {
         this.unregisterDisposer(contactSiteGroup);
         this.pairwiseContactSiteLists.splice(index, 1);
         contactSiteGroup.dispose();
+        this.changed.dispatch();
         return true;
       }
     } else {

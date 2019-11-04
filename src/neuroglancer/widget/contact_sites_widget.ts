@@ -240,6 +240,7 @@ export class PairwiseContactSitesWidget extends RefCounted {
       const deleteConfirmed = confirm(
           `Are you sure you want to delete contact sites group ${pairwiseContactSiteGroup.name}?`);
       if (deleteConfirmed) {
+        segmentationLayer.contactSites.deleteContactSiteGroup(pairwiseContactSiteGroup);
         annotationLayerForContactSitesPair.renderLayers.forEach(renderLayer => {
           segmentationLayer.removeRenderLayer(renderLayer);
         });
