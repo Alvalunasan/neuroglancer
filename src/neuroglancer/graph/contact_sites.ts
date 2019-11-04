@@ -151,13 +151,9 @@ export class PairwiseContactSites extends ContactSiteGroup {
 
 const PAIRWISE_CONTACT_SITES_JSON_KEY = 'pairwiseContactSites';
 // const CONTACT_PARTNERS_FOR_ROOT_JSON_KEY = 'contactPartnersForRoot';
-const SELECTED_SEGMENT1_JSON_KEY = 'selectedSegment1';
-const SELECTED_SEGMENT2_JSON_KEY = 'selectedSegment2';
 
 export class ContactSites extends RefCounted {
   pairwiseContactSiteLists: PairwiseContactSites[] = [];
-  selectedSegment1?: Uint64;
-  selectedSegment2?: Uint64;
   changed = this.registerDisposer(new NullarySignal());
   private disposerMap = new Map<ContactSiteGroup, Disposer>();
 
@@ -203,14 +199,6 @@ export class ContactSites extends RefCounted {
       this.registerDisposer(curContactSitesGroupObject.changed.add(this.changed.dispatch));
       this.pairwiseContactSiteLists.push(curContactSitesGroupObject);
     });
-    const selectedSegment1 = specification[SELECTED_SEGMENT1_JSON_KEY];
-    if (selectedSegment1 !== undefined) {
-      this.selectedSegment1 = Uint64.parseString(String(selectedSegment1), 10);
-    }
-    const selectedSegment2 = specification[SELECTED_SEGMENT2_JSON_KEY];
-    if (selectedSegment2 !== undefined) {
-      this.selectedSegment2 = Uint64.parseString(String(selectedSegment2), 10);
-    }
   }
 
   toJSON() {
@@ -220,12 +208,6 @@ export class ContactSites extends RefCounted {
       pairwiseContactSitesJSON.push(contactSitesGroup.toJSON());
     });
     x[PAIRWISE_CONTACT_SITES_JSON_KEY] = pairwiseContactSitesJSON;
-    if (this.selectedSegment1) {
-      x[SELECTED_SEGMENT1_JSON_KEY] = this.selectedSegment1.toJSON();
-    }
-    if (this.selectedSegment2) {
-      x[SELECTED_SEGMENT2_JSON_KEY] = this.selectedSegment2.toJSON();
-    }
     return x;
   }
 }

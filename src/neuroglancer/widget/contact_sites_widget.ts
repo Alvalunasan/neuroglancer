@@ -83,7 +83,7 @@ export class PairwiseContactSitesWidget extends RefCounted {
     const addSegmentLabel = document.createElement('span');
     addSegmentLabel.textContent = 'Enter segment IDs: ';
     const addSegmentInput = this.registerDisposer(new Uint64EntryWidget());
-    addSegmentInput.element.style.display = 'inline-block';
+    addSegmentInput.element.id = 'add-segment-for-contact-site-lookup';
     const addSegmentElement = document.createElement('div');
     addSegmentElement.appendChild(addSegmentLabel);
     addSegmentElement.appendChild(addSegmentInput.element);
@@ -152,13 +152,13 @@ export class PairwiseContactSitesWidget extends RefCounted {
       } else {
         const firstSegmentClone = this.segment1.clone();
         const secondSegmentClone = this.segment2.clone();
-        this.contactSiteGroupIdCounter++;
         const contactSitesForPairTitle = (contactSiteNameInput.value) ?
             contactSiteNameInput.value :
             `Contact Sites for Pair #${this.contactSiteGroupIdCounter}`;
         contactSiteNameInput.value = '';
         contactSiteNameInput.placeholder =
             `Contact Sites for Pair #${this.contactSiteGroupIdCounter + 1}`;
+        this.contactSiteGroupIdCounter++;
         this.deselectSegment1();
         this.deselectSegment2();
         segmentationLayer.chunkedGraphLayer!
@@ -205,15 +205,14 @@ export class PairwiseContactSitesWidget extends RefCounted {
     });
 
     // Create header elements for minimizable group
-    // TODO: Move styling to CSS sheet
     const colorWidget =
         annotationLayerForContactSitesPair.registerDisposer(new ColorWidget(annotationColor));
-    colorWidget.element.style.height = '1.3em';
-    colorWidget.element.style.width = '1.5em';
-    colorWidget.element.style.top = '-10%';
+    colorWidget.element.classList.add('neuroglancer-contact-site-color-select');
     const groupDisplayedOrHidden = new TrackableBoolean(true);
     const showOrHideContactSitesGroupCheckbox =
         new TrackableBooleanCheckbox(groupDisplayedOrHidden);
+    showOrHideContactSitesGroupCheckbox.element.classList.add(
+        'neuroglancer-toggle-contact-site-visibility');
     annotationLayerForContactSitesPair.registerDisposer(groupDisplayedOrHidden.changed.add(() => {
       if (groupDisplayedOrHidden.value) {
         annotationLayerForContactSitesPair.renderLayers.forEach(renderLayer => {
@@ -226,16 +225,14 @@ export class PairwiseContactSitesWidget extends RefCounted {
       }
       segmentationLayer.manager.layerManager.layersChanged.dispatch();
     }));
-    showOrHideContactSitesGroupCheckbox.element.style.transform = 'scale(1.7)';
-    showOrHideContactSitesGroupCheckbox.element.style.verticalAlign = 'bottom';
     const deleteGroupButton = document.createElement('button');
     deleteGroupButton.textContent = 'x';
-    deleteGroupButton.style.verticalAlign = 'bottom';
+    deleteGroupButton.classList.add('neuroglancer-delete-contact-site-group');
 
     const minimizableGroupForContactSitesPair = new MinimizableGroupWidgetWithHeader(
         pairwiseContactSiteGroup.name,
         [showOrHideContactSitesGroupCheckbox.element, colorWidget.element, deleteGroupButton]);
-    minimizableGroupForContactSitesPair.element.style.marginLeft = '6%';
+    minimizableGroupForContactSitesPair.element.classList.add('neuroglancer-contact-site-group');
     deleteGroupButton.addEventListener('click', () => {
       const deleteConfirmed = confirm(
           `Are you sure you want to delete contact sites group ${pairwiseContactSiteGroup.name}?`);
