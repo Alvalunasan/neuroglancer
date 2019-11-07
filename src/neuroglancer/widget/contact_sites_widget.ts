@@ -17,9 +17,11 @@
 import './contact_sites_widget.css';
 
 import {vec3} from 'gl-matrix';
+import {annotationToJson, AnnotationType, Point} from 'neuroglancer/annotation';
 import {setAnnotationHoverStateFromMouseState} from 'neuroglancer/annotation/selection';
 import {SpontaneousAnnotationLayer} from 'neuroglancer/annotation/spontaneous_annotation_layer';
 import {PairwiseContactSites} from 'neuroglancer/graph/contact_sites';
+import {ManagedUserLayerWithSpecification} from 'neuroglancer/layer_specification';
 import {SegmentationUserLayerWithGraph} from 'neuroglancer/segmentation_user_layer_with_graph';
 import {StatusMessage} from 'neuroglancer/status';
 import {TrackableBoolean, TrackableBooleanCheckbox} from 'neuroglancer/trackable_boolean';
@@ -30,6 +32,8 @@ import {Uint64} from 'neuroglancer/util/uint64';
 import {ColorWidget} from 'neuroglancer/widget/color';
 import {MinimizableGroupWidget, MinimizableGroupWidgetWithHeader} from 'neuroglancer/widget/minimizable_group';
 import {Uint64EntryWidget} from 'neuroglancer/widget/uint64_entry_widget';
+
+const tempVec = vec3.create();
 
 export class PairwiseContactSitesWidget extends RefCounted {
   groupElement = this.registerDisposer(new MinimizableGroupWidget('Contact Sites (for pair)'));
@@ -189,6 +193,43 @@ export class PairwiseContactSitesWidget extends RefCounted {
     this.groupElement.appendFixedChild(getContactSitesButton);
   }
 
+  private createAnnotationLayerFromContactSites(pairwiseContactSiteGroup: PairwiseContactSites) {
+    const {segmentationLayer} = this;
+    const layer = new ManagedUserLayerWithSpecification(
+        pairwiseContactSiteGroup.name, {}, segmentationLayer.manager);
+    let layerName: string|undefined;
+    segmentationLayer.manager.layerManager.managedLayers.forEach(managedLayer => {
+      if (managedLayer.layer === segmentationLayer) {
+        layerName = managedLayer.name;
+      }
+    });
+    const createAnnotationsJSON = () => {
+      const annotationResult: any[] = [];
+      pairwiseContactSiteGroup.contactSites.forEach(contactSite => {
+        // Contact sites are stored in global (nm) coordinates but the user annotation layer
+        // expects them in voxel coordinates, so divide by voxel size
+        vec3.div(tempVec, contactSite.coordinate, segmentationLayer.manager.voxelSize.size);
+        const contactSitePoint: Point = {
+          id: '',
+          segments: [pairwiseContactSiteGroup.segment1, pairwiseContactSiteGroup.segment2],
+          description: `Area = ${contactSite.area} vx`,
+          point: tempVec,
+          type: AnnotationType.POINT
+        };
+        annotationResult.push(annotationToJson(contactSitePoint));
+      });
+      return annotationResult;
+    };
+    segmentationLayer.manager.initializeLayerFromSpec(layer, {
+      type: 'annotation',
+      name: pairwiseContactSiteGroup.name,
+      linkedSegmentationLayer: layerName,
+      annotations: createAnnotationsJSON()
+    });
+    segmentationLayer.manager.add(layer);
+    StatusMessage.showTemporaryMessage('New annotation layer created!', 3000);
+  }
+
   private createContactSiteGroupElement(
       pairwiseContactSiteGroup: PairwiseContactSites, existingGroup: boolean) {
     const {color: annotationColor, segment1, segment2} = pairwiseContactSiteGroup;
@@ -254,6 +295,13 @@ export class PairwiseContactSitesWidget extends RefCounted {
           'neuroglancer-minimizable-group-title');
       groupTitle[0].classList.toggle('minimized');
     }
+
+    const exportToAnnotationLayerButton = document.createElement('button');
+    exportToAnnotationLayerButton.textContent = 'Export to annotation layer';
+    exportToAnnotationLayerButton.addEventListener('click', () => {
+      this.createAnnotationLayerFromContactSites(pairwiseContactSiteGroup);
+    });
+    minimizableGroupForContactSitesPair.appendFixedChild(exportToAnnotationLayerButton);
 
     const segment1Div = document.createElement('div');
     segment1Div.textContent = `Segment 1: ${segment1.toString()}`;
