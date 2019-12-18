@@ -171,7 +171,8 @@ export class PairwiseContactSitesWidget extends RefCounted {
                 segmentationLayer.displayState.timestamp.value)
             .then((contactSites) => {
               if (contactSites.length === 0) {
-                StatusMessage.showTemporaryMessage(`${firstSegmentClone.toString()} and ${
+                const status = new StatusMessage();
+                status.setErrorMessage(`${firstSegmentClone.toString()} and ${
                     secondSegmentClone.toString()} do not have any contact sites`);
               } else {
                 StatusMessage.showTemporaryMessage(
