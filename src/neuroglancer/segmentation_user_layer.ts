@@ -55,6 +55,7 @@ import {Tab} from 'neuroglancer/widget/tab_view';
 import {Uint64EntryWidget} from 'neuroglancer/widget/uint64_entry_widget';
 import {PickState} from 'neuroglancer/layer';
 import {AraAtlas} from 'neuroglancer/ui/ara_atlas';
+import {PmaAtlas} from 'neuroglancer/ui/pma_atlas';
 
 
 const SELECTED_ALPHA_JSON_KEY = 'selectedAlpha';
@@ -89,10 +90,6 @@ const lastSegmentSelection = new Uint64();
 
 const Base = UserLayerWithVolumeSourceMixin(UserLayer);
 export class SegmentationUserLayer extends Base {
-
-  /**
-   * Atlas to use for id lookup.
-  */
   atlas: AraAtlas|null|undefined = null;
 
   displayState: SegmentationUserLayerDisplayState = {
@@ -128,6 +125,7 @@ export class SegmentationUserLayer extends Base {
   meshLayer: Borrowed<MeshLayer|MultiscaleMeshLayer>|undefined;
   skeletonLayer: Borrowed<SkeletonLayer>|undefined;
   segmentMetadata: Borrowed<SegmentMetadata>|undefined;
+  atlasType: string|undefined;
 
   // Dispatched when either meshLayer or skeletonLayer changes.
   objectLayerStateChanged = new NullarySignal();
@@ -143,8 +141,6 @@ export class SegmentationUserLayer extends Base {
 
   constructor(public manager: LayerListSpecification, x: any) {
     super(manager, x);
-
-    this.atlas = new AraAtlas();
 
     this.displayState.rootSegments.changed.add((segmentIds: Uint64[]|Uint64|null, add: boolean) => {
       if (segmentIds !== null) {
@@ -174,28 +170,10 @@ export class SegmentationUserLayer extends Base {
     this.tabs.default = 'rendering';
   }
 
-  /* Kludge to catch changes to the voxel state (e.g., mouse movement).
-    A better solution would tap directly into LayerSelectedValues.values and update on render only.
-  */
-   ontfield: HTMLElement | null = document.getElementById('onttext');
-   oldvalue: any|null|undefined;
-   getValueAt(position: Float32Array, pickState: PickState) {
-     let newvalue = super.getValueAt(position, pickState);
-     if (newvalue !== null && (+newvalue !== +this.oldvalue)) {
-       console.log('I got a new value! ' + newvalue + ' vs ' + this.oldvalue);
-       if (! (typeof this.atlas === 'undefined' || this.atlas === null) && (this.ontfield != null)) {
-                 this.ontfield.innerHTML = '' + this.atlas.getNameForId(+newvalue.toString());
-       }
-     }
-     this.oldvalue = newvalue;
-     return newvalue;
-   }
 
   get volumeOptions() {
     return {volumeType: VolumeType.SEGMENTATION};
   }
-
-
 
   restoreState(specification: any) {
     super.restoreState(specification);
@@ -317,6 +295,17 @@ export class SegmentationUserLayer extends Base {
     if (multiscaleSource !== undefined) {
       ++remaining;
       multiscaleSource.then(volume => {
+        console.log(volume.atlasType);
+
+        if (volume.atlasType) {
+          if (volume.atlasType == 'Allen') {
+            this.atlas =  new AraAtlas();
+            } 
+          else if (volume.atlasType == 'Princeton') {
+            this.atlas = new PmaAtlas();
+            }
+          }
+
         if (!this.wasDisposed) {
           const {displayState} = this;
           this.addRenderLayer(new SegmentationRenderLayer(volume, {
@@ -383,8 +372,30 @@ export class SegmentationUserLayer extends Base {
         }
       });
     }
+    
   }
+  // if (this.atlas == null) {
 
+  ontfield: HTMLElement | null = document.getElementById('onttext');
+  oldvalue: any|null|undefined;
+  getValueAt(position: Float32Array, pickState: PickState) {
+   if (this.atlas !== null) {
+     let newvalue = super.getValueAt(position, pickState);
+     if (newvalue !== null && (+newvalue !== +this.oldvalue)) {
+       console.log('I got a new value! ' + newvalue + ' vs ' + this.oldvalue);
+       if (! (typeof this.atlas === 'undefined' || this.atlas === null) && (this.ontfield != null)) {
+                 this.ontfield.innerHTML = '' + this.atlas.getNameForId(+newvalue.toString());
+       } 
+     }
+     this.oldvalue = newvalue;
+     return newvalue;
+    } else {
+      console.log("No atlas!")
+    }
+  }
+  // } else {
+  //   console.log("no atlas!");
+  // }
   private shouldRenderMesh() : boolean {
     return getRenderMeshByDefault() && this.loadMeshes.value;
   }

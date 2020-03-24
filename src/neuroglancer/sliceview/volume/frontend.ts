@@ -191,6 +191,7 @@ export interface MultiscaleVolumeChunkSource extends MultiscaleSliceViewChunkSou
   numChannels: number;
   dataType: DataType;
   volumeType: VolumeType;
+  atlasType?: string;
 
   /**
    * Returns the associated mesh source, if there is one.

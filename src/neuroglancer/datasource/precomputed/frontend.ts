@@ -107,6 +107,7 @@ export class MultiscaleVolumeChunkSource implements GenericMultiscaleVolumeChunk
   mesh: string|undefined;
   skeletons: string|undefined;
   segmentMetadata: string|undefined;
+  atlasType: string|undefined;
   scales: ScaleInfo[];
 
   getMeshSource() {
@@ -133,6 +134,14 @@ export class MultiscaleVolumeChunkSource implements GenericMultiscaleVolumeChunk
     return null;
   }
 
+  // getAtlasType() {
+  //   const {atlasType} = this;
+  //   if (atlasType !== undefined) {
+  //     return atlasType;
+  //   }
+  //   return null;
+  // }
+
   constructor(public chunkManager: ChunkManager, public url: string, obj: any) {
     verifyObject(obj);
     const redirect = verifyObjectProperty(obj, 'redirect', verifyOptionalString);
@@ -151,6 +160,7 @@ export class MultiscaleVolumeChunkSource implements GenericMultiscaleVolumeChunk
     this.skeletons = verifyObjectProperty(obj, 'skeletons', verifyOptionalString);
     this.scales = verifyObjectProperty(obj, 'scales', x => parseArray(x, y => new ScaleInfo(y)));
     this.segmentMetadata = verifyObjectProperty(obj, 'segmentMetadata', verifyOptionalString);
+    this.atlasType = verifyObjectProperty(obj, 'atlas_type', verifyOptionalString);
   }
 
   getSources(volumeSourceOptions: VolumeSourceOptions) {

@@ -110,6 +110,8 @@ export interface DataSource {
       (chunkManager: ChunkManager, path: string, cancellationToken: CancellationToken):
           Promise<SegmentToVoxelCountMap>;
 
+  // getAtlasType?(path: string): string;
+
   /**
    * Returns a suggested layer name for the given volume source.
    */
@@ -218,6 +220,7 @@ export class DataSourceProvider extends RefCounted {
     });
   }
 
+
   volumeCompleter(url: string, chunkManager: ChunkManager, cancellationToken = uncancelableToken):
       Promise<CompletionResult> {
     // Check if url matches a protocol.  Note that protocolPattern always matches.
@@ -259,4 +262,15 @@ export class DataSourceProvider extends RefCounted {
     let helper = dataSource.findSourceGroup || findSourceGroupBasedOnSeparator;
     return helper(path) + dataSourceName.length + 3;
   }
+
+  // getAtlasType(url: string) {
+  //   let [dataSource] = this.getDataSource(url);
+  //   console.log(dataSource);
+  //   let atlasType = dataSource.getAtlasType;
+  //   if (atlasType !== undefined) {
+  //     return atlasType;
+  //   }
+  //   return null;
+  // }
+
 }
