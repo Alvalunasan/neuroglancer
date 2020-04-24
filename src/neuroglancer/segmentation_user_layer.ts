@@ -56,6 +56,7 @@ import {Uint64EntryWidget} from 'neuroglancer/widget/uint64_entry_widget';
 import {PickState} from 'neuroglancer/layer';
 import {AraAtlas} from 'neuroglancer/ui/ara_atlas';
 import {PmaAtlas} from 'neuroglancer/ui/pma_atlas';
+import {MriAtlas} from 'neuroglancer/ui/rat_mri_atlas';
 
 
 const SELECTED_ALPHA_JSON_KEY = 'selectedAlpha';
@@ -303,6 +304,9 @@ export class SegmentationUserLayer extends Base {
             } 
           else if (volume.atlasType == 'Princeton') {
             this.atlas = new PmaAtlas();
+            }
+          else if (volume.atlasType == 'Brodylab') {
+            this.atlas = new MriAtlas();
             }
           }
 
