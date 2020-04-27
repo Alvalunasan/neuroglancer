@@ -30,6 +30,8 @@ import {vec3, vec3Key} from 'neuroglancer/util/geom';
 import {Uint64} from 'neuroglancer/util/uint64';
 import {GL} from 'neuroglancer/webgl/context';
 import {ShaderBuilder, ShaderProgram} from 'neuroglancer/webgl/shader';
+import {CustomAtlasMap} from 'neuroglancer/custom_atlas_map';
+
 
 export type VolumeChunkKey = string;
 
@@ -192,6 +194,7 @@ export interface MultiscaleVolumeChunkSource extends MultiscaleSliceViewChunkSou
   dataType: DataType;
   volumeType: VolumeType;
   atlasType?: string;
+  atlasPath?: string;
 
   /**
    * Returns the associated mesh source, if there is one.
@@ -223,4 +226,6 @@ export interface MultiscaleVolumeChunkSource extends MultiscaleSliceViewChunkSou
   getStaticAnnotations?: () => AnnotationSource;
 
   getSegmentToVoxelCountMap?: () => Promise<SegmentToVoxelCountMap|null>| null;
+
+  getCustomAtlasMap?: () => Promise<CustomAtlasMap|null>| null;
 }

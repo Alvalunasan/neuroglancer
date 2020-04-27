@@ -28,6 +28,7 @@ import {MultiscaleVolumeChunkSource as GenericMultiscaleVolumeChunkSource, Volum
 import {mat4, vec3} from 'neuroglancer/util/geom';
 import {fetchOk, parseSpecialUrl} from 'neuroglancer/util/http_request';
 import {parseArray, parseFixedLengthArray, parseIntVec, verifyArray, verifyEnumString, verifyFiniteFloat, verifyFinitePositiveFloat, verifyInt, verifyObject, verifyObjectProperty, verifyOptionalString, verifyPositiveInt, verifyString} from 'neuroglancer/util/json';
+import {CustomAtlasMap} from 'neuroglancer/custom_atlas_map';
 
 class PrecomputedVolumeChunkSource extends
 (WithParameters(VolumeChunkSource, VolumeChunkSourceParameters)) {}
@@ -108,6 +109,7 @@ export class MultiscaleVolumeChunkSource implements GenericMultiscaleVolumeChunk
   skeletons: string|undefined;
   segmentMetadata: string|undefined;
   atlasType: string|undefined;
+  atlasPath: string|undefined;
   scales: ScaleInfo[];
 
   getMeshSource() {
@@ -134,13 +136,13 @@ export class MultiscaleVolumeChunkSource implements GenericMultiscaleVolumeChunk
     return null;
   }
 
-  // getAtlasType() {
-  //   const {atlasType} = this;
-  //   if (atlasType !== undefined) {
-  //     return atlasType;
-  //   }
-  //   return null;
-  // }
+  getCustomAtlasMap() {
+    const {atlasPath} = this;
+    if (atlasPath !== undefined) {
+      return getCustomAtlasMap(this.chunkManager, resolvePath(this.url, atlasPath));
+    }
+    return null;
+  }
 
   constructor(public chunkManager: ChunkManager, public url: string, obj: any) {
     verifyObject(obj);
@@ -161,6 +163,7 @@ export class MultiscaleVolumeChunkSource implements GenericMultiscaleVolumeChunk
     this.scales = verifyObjectProperty(obj, 'scales', x => parseArray(x, y => new ScaleInfo(y)));
     this.segmentMetadata = verifyObjectProperty(obj, 'segmentMetadata', verifyOptionalString);
     this.atlasType = verifyObjectProperty(obj, 'atlas_type', verifyOptionalString);
+    this.atlasPath = verifyObjectProperty(obj, 'atlas_path', verifyOptionalString);
   }
 
   getSources(volumeSourceOptions: VolumeSourceOptions) {
@@ -380,6 +383,29 @@ export function getSegmentToVoxelCountMap(
       }));
 }
 
+function parseCustomAtlasMap(data: any) {
+  const customAtlasMap = <CustomAtlasMap>new Map<number, string>();
+  verifyArray(data);
+  data.forEach((region: any) => {
+    verifyObject(region);
+    const regionId = verifyObjectProperty(region, 'regionId', verifyInt);
+    const regionName = verifyObjectProperty(region, 'regionName', verifyString);
+    customAtlasMap.set(regionId, regionName);
+  });
+  return customAtlasMap;
+}
+
+export function getCustomAtlasMap(
+    chunkManager: ChunkManager, url: string): Promise<CustomAtlasMap> {
+  return chunkManager.memoize.getUncounted(
+      {'type': 'precomputed:CustomAtlasMap', url}, () => fetchOk(url).then(response => {
+        if (!response.ok) {
+          throw new Error('Request for custom atlas map failed');
+        }
+        return response.json().then(value => parseCustomAtlasMap(value));
+      }));
+}
+
 export class PrecomputedDataSource extends DataSource {
   get description() {
     return 'Precomputed file-backed data source';
@@ -395,5 +421,8 @@ export class PrecomputedDataSource extends DataSource {
   }
   getSegmentToVoxelCountMap(chunkManager: ChunkManager, url: string) {
     return getSegmentToVoxelCountMap(chunkManager, parseSpecialUrl(url));
+  }
+  getCustomAtlasMap(chunkManager: ChunkManager, url: string) {
+    return getCustomAtlasMap(chunkManager, parseSpecialUrl(url));
   }
 }

@@ -26,6 +26,8 @@ import {MultiscaleVolumeChunkSource} from 'neuroglancer/sliceview/volume/fronten
 import {CancellationToken, uncancelableToken} from 'neuroglancer/util/cancellation';
 import {applyCompletionOffset, CompletionWithDescription} from 'neuroglancer/util/completion';
 import {Owned, RefCounted} from 'neuroglancer/util/disposable';
+import {CustomAtlasMap} from 'neuroglancer/custom_atlas_map';
+
 
 export type Completion = CompletionWithDescription;
 
@@ -109,6 +111,10 @@ export interface DataSource {
   getSegmentToVoxelCountMap?
       (chunkManager: ChunkManager, path: string, cancellationToken: CancellationToken):
           Promise<SegmentToVoxelCountMap>;
+
+  getCustomAtlasMap?
+      (chunkManager: ChunkManager, path: string, cancellationToken: CancellationToken):
+          Promise<CustomAtlasMap>;
 
   // getAtlasType?(path: string): string;
 
@@ -217,6 +223,14 @@ export class DataSourceProvider extends RefCounted {
     const [dataSource, path] = this.getDataSource(url);
     return new Promise<SegmentToVoxelCountMap>(resolve => {
       resolve(dataSource.getSegmentToVoxelCountMap!(chunkManager, path, cancellationToken));
+    });
+  }
+
+  getCustomAtlasMap(
+      chunkManager: ChunkManager, url: string, cancellationToken = uncancelableToken) {
+    const [dataSource, path] = this.getDataSource(url);
+    return new Promise<CustomAtlasMap>(resolve => {
+      resolve(dataSource.getCustomAtlasMap!(chunkManager, path, cancellationToken));
     });
   }
 

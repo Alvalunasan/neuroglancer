@@ -1,0 +1,34 @@
+{
+  "data_type": "uint16",
+  "num_channels": 1,
+  "scales": [
+    {
+      "chunk_sizes": [
+        [
+          1024,
+          1024,
+          1
+        ]
+      ],
+      "encoding": "raw",
+      "key": "20000_20000_20000",
+      "resolution": [
+        20000,
+        20000,
+        20000
+      ],
+      "size": [
+        352,
+        640,
+        540
+      ],
+      "voxel_offset": [
+        0,
+        0,
+        1
+      ]
+    }
+  ],
+  "type": "segmentation",
+  "atlas_path": "my_custom_atlas.json"
+}

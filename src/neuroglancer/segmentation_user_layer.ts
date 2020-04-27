@@ -57,7 +57,7 @@ import {PickState} from 'neuroglancer/layer';
 import {AraAtlas} from 'neuroglancer/ui/ara_atlas';
 import {PmaAtlas} from 'neuroglancer/ui/pma_atlas';
 import {MriAtlas} from 'neuroglancer/ui/rat_mri_atlas';
-
+import {CustomAtlas} from 'neuroglancer/ui/custom_atlas';
 
 const SELECTED_ALPHA_JSON_KEY = 'selectedAlpha';
 const NOT_SELECTED_ALPHA_JSON_KEY = 'notSelectedAlpha';
@@ -126,7 +126,8 @@ export class SegmentationUserLayer extends Base {
   meshLayer: Borrowed<MeshLayer|MultiscaleMeshLayer>|undefined;
   skeletonLayer: Borrowed<SkeletonLayer>|undefined;
   segmentMetadata: Borrowed<SegmentMetadata>|undefined;
-  atlasType: string|undefined;
+  customAtlasMapPath: string|undefined;
+  // customAtlasMap: Map|null|undefined;
 
   // Dispatched when either meshLayer or skeletonLayer changes.
   objectLayerStateChanged = new NullarySignal();
@@ -296,9 +297,15 @@ export class SegmentationUserLayer extends Base {
     if (multiscaleSource !== undefined) {
       ++remaining;
       multiscaleSource.then(volume => {
-        console.log(volume.atlasType);
+        // console.log(volume.atlasType);
+        // console.log(volume.atlasPath);
 
-        if (volume.atlasType) {
+        if (volume.atlasPath) {
+          console.log("A custom atlas was provided!");
+          this.atlas = new CustomAtlas();
+        }
+  
+        else if (volume.atlasType) {
           if (volume.atlasType == 'Allen') {
             this.atlas =  new AraAtlas();
             } 
@@ -308,7 +315,8 @@ export class SegmentationUserLayer extends Base {
           else if (volume.atlasType == 'Brodylab') {
             this.atlas = new MriAtlas();
             }
-          }
+        }
+
 
         if (!this.wasDisposed) {
           const {displayState} = this;
@@ -356,7 +364,10 @@ export class SegmentationUserLayer extends Base {
           }
           if (segmentToVoxelCountMapPath === undefined && volume.getSegmentToVoxelCountMap) {
             ++remaining;
+
             Promise.resolve(volume.getSegmentToVoxelCountMap()).then(segmentToVoxelCountMap => {
+              console.log(segmentToVoxelCountMap);
+
               if (this.wasDisposed) {
                 return;
               }
@@ -370,6 +381,30 @@ export class SegmentationUserLayer extends Base {
               }
             });
           }
+
+          if (volume.getCustomAtlasMap) {
+            ++remaining;
+
+            Promise.resolve(volume.getCustomAtlasMap()).then(customAtlasMap => {
+              console.log(customAtlasMap);
+              if (customAtlasMap) {
+                  customAtlasMap.forEach((value: string, key: number) => {
+                    console.log(key,value);
+                    if (this.atlas) {  
+                      this.atlas.ara_id.set(key,value);
+                    }
+                  });
+              }
+
+              if (this.wasDisposed) {
+                return;
+              }
+              if (--remaining === 0) {
+                this.isReady = true;
+              }
+
+            });
+          }
           if (--remaining === 0) {
             this.isReady = true;
           }
@@ -378,8 +413,8 @@ export class SegmentationUserLayer extends Base {
     }
     
   }
-  // if (this.atlas == null) {
 
+  // Update the ontfield div text with atlas label of whatever segment has cursor focus
   ontfield: HTMLElement | null = document.getElementById('onttext');
   oldvalue: any|null|undefined;
   getValueAt(position: Float32Array, pickState: PickState) {
@@ -397,9 +432,7 @@ export class SegmentationUserLayer extends Base {
       console.log("No atlas!")
     }
   }
-  // } else {
-  //   console.log("no atlas!");
-  // }
+ 
   private shouldRenderMesh() : boolean {
     return getRenderMeshByDefault() && this.loadMeshes.value;
   }
