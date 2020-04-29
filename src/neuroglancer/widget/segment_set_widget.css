@@ -46,7 +46,8 @@
 
 .eyes-symbol-for-button {
   font-size: 1.1em;
-  position: relative;
+  /*position: relative;
+  */
   bottom: 2px;
 }
 
