@@ -420,8 +420,8 @@ export class SegmentationUserLayer extends Base {
   getValueAt(position: Float32Array, pickState: PickState) {
    if (this.atlas !== null) {
      let newvalue = super.getValueAt(position, pickState);
-     if (newvalue !== null && (+newvalue !== +this.oldvalue)) {
-       console.log('I got a new value! ' + newvalue + ' vs ' + this.oldvalue);
+     if (newvalue !== null && newvalue !== undefined && (+newvalue !== +this.oldvalue)) {
+       // console.log('I got a new value! ' + newvalue + ' vs ' + this.oldvalue);
        if (! (typeof this.atlas === 'undefined' || this.atlas === null) && (this.ontfield != null)) {
                  this.ontfield.innerHTML = '' + this.atlas.getNameForId(+newvalue.toString());
        } 
@@ -540,6 +540,7 @@ export class SegmentationUserLayer extends Base {
     }
     switch (action) {
       case 'recolor': {
+        console.log("Recoloring!")
         this.displayState.segmentColorHash.randomize();
         break;
       }
@@ -548,6 +549,28 @@ export class SegmentationUserLayer extends Base {
         this.displayState.visibleSegments2D!.clear();
         this.displayState.visibleSegments3D.clear();
         this.displayState.segmentEquivalences.clear();
+        break;
+      }
+      case 'select-all-segments': {
+        if (this.atlas) {
+          console.log('Selecting all segments!');
+          const ara_keys = this.atlas.ara_id.keys();
+          for (let key of ara_keys) {
+            const id_uint64 = new Uint64(key,0);
+            // console.log(id_uint64);
+            this.displayState.rootSegments.add(id_uint64); 
+            // console.log(key);
+          }
+          StatusMessage.showTemporaryMessage(
+            'All segments added!',
+            2000);
+        }
+        else {
+          StatusMessage.showTemporaryMessage(
+            'This feature is only available if atlas metadata is provided',
+            5000);
+        }
+        
         break;
       }
       case 'merge-selected': {
