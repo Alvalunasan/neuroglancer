@@ -14,26 +14,57 @@
  * limitations under the License.
  */
 
-import './autocomplete_atlas.css';
-import { AutocompleteTextInput, Completer} from './autocomplete';
+import debounce from 'lodash/debounce';
+import {CancellationToken, CancellationTokenSource} from 'neuroglancer/util/cancellation';
+import {BasicCompletionResult, Completion, CompletionWithDescription} from 'neuroglancer/util/completion';
 import {RefCounted} from 'neuroglancer/util/disposable';
-import {Signal} from 'neuroglancer/util/signal';
-import {Uint64} from 'neuroglancer/util/uint64';
-import {CompletionWithDescription} from 'neuroglancer/util/completion';
+import {removeChildren, removeFromParent} from 'neuroglancer/util/dom';
 import {EventActionMap, KeyboardEventBinder, registerActionListener} from 'neuroglancer/util/keyboard_bindings';
+import {longestCommonPrefix} from 'neuroglancer/util/longest_common_prefix';
+import {scrollIntoViewIfNeeded} from 'neuroglancer/util/scroll_into_view';
+import {Signal} from 'neuroglancer/util/signal';
+import {associateLabelWithElement} from 'neuroglancer/widget/associate_label';
+import {Uint64} from 'neuroglancer/util/uint64';
 
-export type Completion = CompletionWithDescription;
+export {Completion, CompletionWithDescription} from 'neuroglancer/util/completion';
+
+import './autocomplete_atlas.css';
+
+const ACTIVE_COMPLETION_CLASS_NAME = 'autocomplete-atlas-completion-active';
+
+const AUTOCOMPLETE_ATLAS_INDEX_SYMBOL = Symbol('autocomplete-atlasIndex');
+
+export interface CompletionResult extends BasicCompletionResult {
+  showSingleResult?: boolean;
+  selectSingleResult?: boolean;
+  makeElement?: (completion: Completion) => HTMLElement;
+}
+
+export function makeDefaultCompletionElement(completion: Completion) {
+  let element = document.createElement('div');
+  element.className = 'autocomplete-atlas-completion-with-description';
+  element.textContent = completion.value;
+  return element;
+}
+
+export function makeCompletionElementWithDescription(completion: CompletionWithDescription) {
+  let element = document.createElement('div');
+  element.className = 'autocomplete-atlas-completion-with-description';
+  element.textContent = completion.value;
+  let descriptionElement = document.createElement('div');
+  descriptionElement.className = 'autocomplete-atlas-completion-description';
+  descriptionElement.textContent = completion.description || '';
+  element.appendChild(descriptionElement);
+  return element;
+}
 
 const keyMap = EventActionMap.fromObject({
+  'arrowdown': {action: 'cycle-next-active-completion'},
+  'arrowup': {action: 'cycle-prev-active-completion'},
   'tab': {action: 'choose-active-completion-or-prefix', preventDefault: false},
   'enter': {action: 'choose-active-completion', preventDefault: false},
   'escape': {action: 'cancel', preventDefault: false, stopPropagation: false},
 });
-
-export interface CompletionResult {
-  offset: number;
-  completions: Completion[];
-}
 
 export class DataAtlasProvider extends RefCounted {
   dataAtlas = new Map<string, number>();
@@ -49,9 +80,9 @@ export class DataAtlasProvider extends RefCounted {
       Promise<CompletionResult> {
         let completions: Completion[] = [];
 
-      for (let [key, value] of this.dataAtlas) {
+      for (let key of this.dataAtlas.keys()) {
         if (key.toLowerCase().includes(name.toLowerCase())) {
-          completions.push({value: key, description: value.toString()});
+          completions.push({value: key});
         }
       }
       return Promise.resolve({offset: 0, completions});
@@ -60,7 +91,13 @@ export class DataAtlasProvider extends RefCounted {
 
 }
 
-export class AutocompleteTextInputAtlas extends AutocompleteTextInput {
+
+export type Completer = (value: string, cancellationToken: CancellationToken) =>
+    Promise<CompletionResult>| null;
+
+const DEFAULT_COMPLETION_DELAY = 200;  // milliseconds
+
+export class AutocompleteTextInputAtlas extends RefCounted {
   element: HTMLDivElement;
   promptElement: HTMLLabelElement;
   inputWrapperElement: HTMLDivElement;
@@ -71,72 +108,517 @@ export class AutocompleteTextInputAtlas extends AutocompleteTextInput {
   valuesEntered = new Signal<(values: Uint64[]) => void>();
   dataAtlasProvider = new DataAtlasProvider();
 
+  private prevInputValue = '';
+  private completionsVisible = false;
+  private activeCompletionPromise: Promise<CompletionResult>|null = null;
+  private activeCompletionCancellationToken: CancellationTokenSource|undefined = undefined;
+  private hasFocus = false;
+  private completionResult: CompletionResult|null = null;
+  private dropdownContentsStale = true;
+  private updateHintScrollPositionTimer: number|null = null;
+  private completionElements: HTMLElement[]|null = null;
+  private hasResultForDropdown = false;
+  private commonPrefix = '';
+
+  /**
+   * Index of the active completion.  The active completion is displayed as the hint text and is
+   * highlighted in the dropdown.
+   */
+  private activeIndex = -1;
+
+  private dropdownStyleStale = true;
+
+  private scheduleUpdateCompletions: () => void;
+  completer: Completer;
+
   constructor(options: {completer: Completer, delay?: number}) {
-    super(options);
-    let inputElement = this.inputElement
+    super();
+    this.completer = options.completer;
+    let {delay = DEFAULT_COMPLETION_DELAY} = options;
+
+    let debouncedCompleter = this.scheduleUpdateCompletions = debounce(() => {
+      const cancellationToken = this.activeCompletionCancellationToken =
+          new CancellationTokenSource();
+      let activeCompletionPromise = this.activeCompletionPromise =
+          this.completer(this.value, cancellationToken);
+      if (activeCompletionPromise !== null) {
+        activeCompletionPromise.then(completionResult => {
+          if (this.activeCompletionPromise === activeCompletionPromise) {
+            this.setCompletions(completionResult);
+            this.activeCompletionPromise = null;
+          }
+        });
+      }
+    }, delay);
+    this.registerDisposer(() => {
+      debouncedCompleter.cancel();
+    });
+
+    let element = this.element = document.createElement('div');
+    element.className = 'autocomplete-atlas';
+
+    let dropdownAndInputWrapper = document.createElement('div');
+    dropdownAndInputWrapper.className = 'autocomplete-atlas-dropdown-wrapper';
+
+    let dropdownElement = this.dropdownElement = document.createElement('div');
+    dropdownElement.className = 'autocomplete-atlas-dropdown';
+
+    let promptElement = this.promptElement = document.createElement('label');
+    promptElement.className = 'autocomplete-atlas-prompt';
+
+    let inputWrapperElement = this.inputWrapperElement = document.createElement('div');
+    inputWrapperElement.className = 'autocomplete-atlas-input-wrapper';
+
+
+    
+    element.appendChild(promptElement);
+
+    let inputElement = this.inputElement = document.createElement('input');
+    inputElement.type = 'text';
+    inputElement.autocomplete = 'off';
+    inputElement.spellcheck = false;
+    inputElement.className = 'autocomplete-atlas-input';
+    associateLabelWithElement(promptElement, inputElement);
+
+    let hintElement = this.hintElement = document.createElement('input');
+    hintElement.type = 'text';
+    hintElement.spellcheck = false;
+    hintElement.className = 'autocomplete-atlas-hint';
+    hintElement.disabled = true;
+    inputWrapperElement.appendChild(hintElement);
+    inputWrapperElement.appendChild(inputElement);
+
+    dropdownAndInputWrapper.appendChild(inputWrapperElement);
+    dropdownAndInputWrapper.appendChild(dropdownElement);
+    element.appendChild(dropdownAndInputWrapper);
+
+    this.registerInputHandler();
+    this.handleInputChanged('');
+
+    this.registerEventListener(this.inputElement, 'focus', () => {
+      if (!this.hasFocus) {
+        this.hasFocus = true;
+        this.dropdownStyleStale = true;
+        this.updateDropdown();
+      }
+    });
+    this.registerEventListener(this.inputElement, 'blur', () => {
+      if (this.hasFocus) {
+        this.hasFocus = false;
+        this.updateDropdown();
+      }
+    });
+    this.registerEventListener(element.ownerDocument!.defaultView!, 'resize', () => {
+      this.dropdownStyleStale = true;
+    });
+
+    this.registerEventListener(element.ownerDocument!.defaultView!, 'scroll', () => {
+      this.dropdownStyleStale = true;
+    });
+
+    this.registerEventListener(
+        this.dropdownElement, 'mousedown', this.handleDropdownMousedown.bind(this));
+
+    this.registerEventListener(this.inputElement, 'keydown', () => {
+      // User may have used a keyboard shortcut to scroll the input.
+      this.hintScrollPositionMayBeStale();
+    });
+
+    this.registerEventListener(this.inputElement, 'mousemove', (event: MouseEvent) => {
+      if (event.buttons !== 0) {
+        // May be dragging the text, which could cause scrolling.  This is not perfect, because we
+        // don't detect mouse movements outside of the input box.
+        this.hintScrollPositionMayBeStale();
+      }
+    });
 
     const keyboardHandler = this.registerDisposer(new KeyboardEventBinder(inputElement, keyMap));
     keyboardHandler.allShortcutsAreGlobal = true;
 
-    this.registerEventListener(
-      this.dropdownElement, 'mousedown', this.handleDropdownMousedown2.bind(this));
+    registerActionListener(inputElement, 'cycle-next-active-completion', () => {
+      this.cycleActiveCompletion(+1);
+    });
+
+    registerActionListener(inputElement, 'cycle-prev-active-completion', () => {
+      this.cycleActiveCompletion(-1);
+    });
 
     registerActionListener(
         inputElement, 'choose-active-completion-or-prefix', (event: CustomEvent) => {
-          this.handleInputEntered()
           if (this.selectActiveCompletion(/*allowPrefix=*/true)) {
-
+            this.handleInputEntered()
             event.preventDefault();
           }
         });
-
-
     registerActionListener(inputElement, 'choose-active-completion', (event: CustomEvent) => {
-      this.handleInputEntered()
       if (this.selectActiveCompletion(/*allowPrefix=*/false)) {
+        this.handleInputEntered()
         event.preventDefault();
       }
     });
-
-
+    registerActionListener(inputElement, 'cancel', (event: CustomEvent) => {
+      event.stopPropagation();
+      if (this.cancel()) {
+        event.detail.preventDefault();
+        event.detail.stopPropagation();
+      }
+    });
   }
 
-  handleInputEntered() {
-  const values = this.validateInput();
-      if (values !== undefined) {
-        this.inputElement.value = '';
-        this.inputElement.classList.remove('valid-input', 'invalid-input');
-        this.valuesEntered.dispatch(values);
-        this.value = '';
-        this.element.blur();
-        this.inputElement.blur();
+  private hintScrollPositionMayBeStale() {
+    if (this.hintElement.value !== '') {
+      this.scheduleUpdateHintScrollPosition();
+    }
+  }
+
+  get disabled() {
+    return this.inputElement.readOnly;
+  }
+
+  set disabled(value: boolean) {
+    this.inputElement.readOnly = value;
+  }
+
+  private handleDropdownMousedown(event: MouseEvent) {
+    this.inputElement.focus();
+    let {dropdownElement} = this;
+    for (let target: EventTarget|null = event.target; target instanceof HTMLElement;
+         target = target.parentElement) {
+      let index = (<any>target)[AUTOCOMPLETE_ATLAS_INDEX_SYMBOL];
+      if (index !== undefined) {
+        this.selectCompletion(index);
+        this.handleInputEntered();
+        break;
+      }
+      if (target === dropdownElement) {
+        break;
       }
     }
-
-  handleDropdownMousedown2(event: MouseEvent) {
-    this.handleInputEntered()
     event.preventDefault();
   }
 
-  registerAtlasProvider(atlasProvider: DataAtlasProvider ) {
-    this.dataAtlasProvider = atlasProvider
+  cycleActiveCompletion(delta: number) {
+    if (this.completionResult === null) {
+      return;
+    }
+    let {activeIndex} = this;
+    let numCompletions = this.completionResult.completions.length;
+    if (activeIndex === -1) {
+      if (delta > 0) {
+        activeIndex = 0;
+      } else {
+        activeIndex = numCompletions - 1;
+      }
+    } else {
+      activeIndex = (activeIndex + delta + numCompletions) % numCompletions;
+    }
+    this.setActiveIndex(activeIndex);
   }
 
-  validateInput(): Uint64[]|undefined {
-    let textinput = this.inputElement.value;
+  private registerInputHandler() {
+    const handler = (_event: Event) => {
+      let value = this.inputElement.value;
+      if (value !== this.prevInputValue) {
+        this.prevInputValue = value;
+        this.handleInputChanged(value);
+      }
+    };
+    for (let eventType of ['input']) {
+      this.registerEventListener(this.inputElement, eventType, handler, /*useCapture=*/false);
+    }
+  }
 
-    const results: Uint64[] = [];
-    if (this.dataAtlasProvider.dataAtlas.has(textinput))
-    {
-      const x = new Uint64(this.dataAtlasProvider.dataAtlas.get(textinput), 0)
-      results.push(x);
+  private shouldShowDropdown() {
+    let {completionResult} = this;
+    if (completionResult === null || !this.hasFocus) {
+      return false;
+    }
+    return this.hasResultForDropdown;
+  }
 
+  private updateDropdownStyle() {
+    let {element, dropdownElement} = this;
+    this.positionDropdown(element, dropdownElement);
+    //this.dropdownElement.s
+    this.dropdownStyleStale = false;
+  }
+
+  private updateDropdown() {
+    if (this.shouldShowDropdown()) {
+      let {dropdownElement} = this;
+      let {activeIndex} = this;
+      if (this.dropdownContentsStale) {
+        let completionResult = this.completionResult!;
+        let {makeElement = makeDefaultCompletionElement} = completionResult;
+        this.completionElements = completionResult.completions.map((completion, index) => {
+          let completionElement = makeElement.call(completionResult, completion);
+          (<any>completionElement)[AUTOCOMPLETE_ATLAS_INDEX_SYMBOL] = index;
+          completionElement.classList.add('autocomplete-completion');
+          if (activeIndex === index) {
+            completionElement.classList.add(ACTIVE_COMPLETION_CLASS_NAME);
+          }
+          dropdownElement.appendChild(completionElement);
+          return completionElement;
+        });
+        this.dropdownContentsStale = false;
+      }
+      if (this.dropdownStyleStale) {
+        this.updateDropdownStyle();
+      }
+      if (!this.completionsVisible) {
+        dropdownElement.style.display = 'block';
+        this.completionsVisible = true;
+      }
+      if (activeIndex !== -1) {
+        let completionElement = this.completionElements![activeIndex];
+        scrollIntoViewIfNeeded(completionElement);
+      }
+    } else if (this.completionsVisible) {
+      this.dropdownElement.style.display = 'none';
+      this.completionsVisible = false;
+    }
+  }
+
+  private setCompletions(completionResult: CompletionResult) {
+    this.clearCompletions();
+    let {completions} = completionResult;
+    if (completions.length === 0) {
+      return;
+    }
+    this.completionResult = completionResult;
+
+    if (completions.length === 1) {
+      let completion = completions[0];
+      if (completionResult.showSingleResult) {
+        this.hasResultForDropdown = true;
+      } else {
+        let value = this.prevInputValue;
+        if (!completion.value.startsWith(value)) {
+          this.hasResultForDropdown = true;
+        } else {
+          this.hasResultForDropdown = false;
+        }
+      }
+      if (completionResult.selectSingleResult) {
+        this.setActiveIndex(0);
+      } else {
+        this.setHintValue(this.getCompletedValueByIndex(0));
+      }
+    } else {
+      this.hasResultForDropdown = true;
+      // Check for a common prefix.
+      let commonResultPrefix = longestCommonPrefix(function*() {
+        for (let completion of completionResult.completions) {
+          yield completion.value;
+        }
+      }());
+      let commonPrefix = this.getCompletedValue(commonResultPrefix);
+      let value = this.prevInputValue;
+      if (commonPrefix.startsWith(value)) {
+        this.commonPrefix = commonPrefix;
+        this.setHintValue(commonPrefix);
+      }
+    }
+    this.updateDropdown();
+  }
+
+  private scheduleUpdateHintScrollPosition() {
+    if (this.updateHintScrollPositionTimer === null) {
+      this.updateHintScrollPositionTimer = setTimeout(() => {
+        this.updateHintScrollPosition();
+      }, 0);
+    }
+  }
+
+  setHintValue(hintValue: string) {
+    let value = this.prevInputValue;
+    if (hintValue === value || !hintValue.startsWith(value)) {
+      // If the hint value is identical to the current value, there is no need to show it.  Also,
+      // if it is not a prefix of the current value, then we cannot show it either.
+      hintValue = '';
+    }
+    this.hintElement.value = hintValue;
+    this.scheduleUpdateHintScrollPosition();
+  }
+
+  /**
+   * This sets the active completion, which causes it to be highlighted and displayed as the hint.
+   * Additionally, if the user hits tab then it is chosen.
+   */
+  private setActiveIndex(index: number) {
+    if (!this.dropdownContentsStale) {
+      let {activeIndex} = this;
+      if (activeIndex !== -1) {
+        this.completionElements![activeIndex].classList.remove(ACTIVE_COMPLETION_CLASS_NAME);
+      }
+      if (index !== -1) {
+        let completionElement = this.completionElements![index];
+        completionElement.classList.add(ACTIVE_COMPLETION_CLASS_NAME);
+        scrollIntoViewIfNeeded(completionElement);
+      }
+    }
+    if (index !== -1) {
+      this.setHintValue(this.getCompletedValueByIndex(index));
+    }
+    this.activeIndex = index;
+  }
+
+  private getCompletedValueByIndex(index: number) {
+    return this.getCompletedValue(this.completionResult!.completions[index].value);
+  }
+
+  private getCompletedValue(completionValue: string) {
+    let completionResult = this.completionResult!;
+    let value = this.prevInputValue;
+    return value.substring(0, completionResult.offset) + completionValue;
+  }
+
+  selectActiveCompletion(allowPrefix: boolean) {
+    let {activeIndex} = this;
+    if (activeIndex === -1) {
+      if (!allowPrefix) {
+        return false;
+      }
+      let {completionResult} = this;
+      if (completionResult !== null && completionResult.completions.length === 1) {
+        activeIndex = 0;
+      } else {
+        let {commonPrefix} = this;
+        if (commonPrefix.length > this.value.length) {
+          this.value = commonPrefix;
+          return true;
+        }
+        return false;
+      }
+    }
+    let newValue = this.getCompletedValueByIndex(activeIndex);
+    if (this.value === newValue) {
+      return false;
+    }
+    this.value = newValue;
+    return true;
+  }
+
+  selectCompletion(index: number) {
+    this.value = this.getCompletedValueByIndex(index);
+  }
+
+  /**
+   * Called when user presses escape.  Does nothing here, but may be overridden in a subclass.
+   */
+  cancel() {
+    return false;
+  }
+
+  /**
+   * Updates the hintElement scroll position to match the scroll position of inputElement.
+   *
+   * This is called asynchronously after the input changes because automatic scrolling appears to
+   * take place after the 'input' event fires.
+   */
+  private updateHintScrollPosition() {
+    this.updateHintScrollPositionTimer = null;
+    this.hintElement.scrollLeft = this.inputElement.scrollLeft;
+  }
+
+  private cancelActiveCompletion() {
+    const token = this.activeCompletionCancellationToken;
+    if (token !== undefined) {
+      token.cancel();
+    }
+    this.activeCompletionCancellationToken = undefined;
+    this.activeCompletionPromise = null;
+  }
+
+  private handleInputChanged(value: string) {
+    this.cancelActiveCompletion();
+    this.hintElement.value = '';
+    this.clearCompletions();
+    this.inputChanged.dispatch(value);
+    this.scheduleUpdateCompletions();
+  }
+
+  private clearCompletions() {
+    if (this.completionResult !== null) {
+      this.activeIndex = -1;
+      this.completionResult = null;
+      this.completionElements = null;
+      this.dropdownContentsStale = true;
+      this.dropdownStyleStale = true;
+      this.commonPrefix = '';
+      removeChildren(this.dropdownElement);
+      this.updateDropdown();
+    }
+  }
+
+  get value() {
+    return this.prevInputValue;
+  }
+
+  set value(value: string) {
+    if (value !== this.prevInputValue) {
+      this.inputElement.value = value;
+      this.prevInputValue = value;
+      this.handleInputChanged(value);
+    }
+  }
+
+  handleInputEntered() {
+    const values = this.validateInput();
+        if (values !== undefined) {
+          this.inputElement.value = '';
+          this.inputElement.classList.remove('valid-input', 'invalid-input');
+          this.valuesEntered.dispatch(values);
+          this.value = '';
+          this.element.blur();
+          this.inputElement.blur();
+        }
+      }
+    
+    registerAtlasProvider(atlasProvider: DataAtlasProvider ) {
+      this.dataAtlasProvider = atlasProvider
+    }
+  
+    validateInput(): Uint64[]|undefined {
+      let textinput = this.inputElement.value;
+  
+      const results: Uint64[] = [];
+      if (this.dataAtlasProvider.dataAtlas.has(textinput))
+      {
+        const x = new Uint64(this.dataAtlasProvider.dataAtlas.get(textinput), 0)
+        results.push(x);
+  
+      }
+  
+      return results;
     }
 
-    return results;
+    positionDropdown(element: HTMLElement, dropdownElement: HTMLElement) {
+
+      let distanceToTop = element.parentElement!.offsetTop;
+      let distanceToTop2 = element.parentElement!.parentElement!.offsetTop;
+      let distanceToTopnew = distanceToTop - distanceToTop2
+      let heightbox = element.parentElement!.parentElement!.offsetHeight;
+      let distanceToBottom = heightbox - distanceToTopnew - element.offsetHeight;
+      
+      dropdownElement.style.top = '100%';
+      dropdownElement.style.bottom = '';
+      dropdownElement.style.maxHeight = distanceToBottom+'px';
+
+      let widthnow = element.parentElement!.parentElement!.offsetWidth;
+      let leftMargin = 15;
+      widthnow -= leftMargin;
+      dropdownElement.style.maxWidth = widthnow + 'px';
+         
+    }
+
+  disposed() {
+    removeFromParent(this.element);
+    this.cancelActiveCompletion();
+    if (this.updateHintScrollPositionTimer !== null) {
+      clearTimeout(this.updateHintScrollPositionTimer);
+      this.updateHintScrollPositionTimer = null;
+    }
+    super.disposed();
   }
-
-
 }
-
-

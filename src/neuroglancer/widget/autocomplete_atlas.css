@@ -14,116 +14,115 @@
  * limitations under the License.
  */
 
-.autocomplete-hint, .autocomplete-input {
-  outline: 0;
-  width: 100%;
-  border: 0;
-  margin: 0;
-  padding: 0;
-}
-
-.autocomplete-prompt, .autocomplete-hint, .autocomplete-input, .autocomplete-completion {
-  font-family: monospace;
-  font-size: medium;
-}
-
-.autocomplete {
-  display: flex;
-  flex-direction: row;
-}
-
-.autocomplete-prompt {
-  display: inline-block;
-}
-
-.autocomplete-prompt:not(:empty) {
-  margin-right: 1em;
-}
-
-.autocomplete-hint {
-  position: absolute;
-  top: 0;
-  left: 0;
-  border-color: transparent;
-  background-color:  #fff;;
-  box-shadow: none;
-  color: #aaa;
-}
-
-.autocomplete-dropdown-wrapper {
-  display: inline-block;
-  position: relative;
-  border: 0;
-  margin: 0;
-  padding: 0;
-  flex: 1;
-}
-
-.autocomplete-input {
-  position: relative;
-  top: 0;
-  left: 0;
-  /* vertical-align: top; */
-  color: #333;
-  background-color: transparent;
-}
-
-.autocomplete-input-wrapper {
-  display: flex;
-  position: relative;
-  outline: 0px;
-  border: 0;
-  margin: 0px;
-  padding: 0px;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  top: 0;
-}
-
-.autocomplete-dropdown {
-  position: absolute;
-  display: none;
-  outline: 0;
-  margin: 0;
-  padding: 0;
-  text-align: left;
-  cursor: default;
-  border-style: solid;
-  border-width: 1px;
-  border-color: #aaa;
-  overflow-y: scroll;
-  overflow-x: hidden;
-  white-space: pre;
-  color: #000;
-}
-
-
-.autocomplete-completion {
-  text-align: right;
-  display: inline;
-  flex: 1;
-  font-style: italic;
-  padding-left: 2em;
-}
-
-.autocomplete-completion:hover {
-  outline: 1px solid #ddd;
-}
-
-.autocomplete-completion-active {
-  background-color: #ccc;
-}
-
-.autocomplete-completion-with-description {
-  display: flex;
-  flex-direction: row;
-}
-
-.autocomplete-completion-description {
-  text-align: right;
-  display: inline;
-  flex: 1;
-  font-style: italic;
-  padding-left: 2em;
-}
+ .autocomplete-atlas-hint, .autocomplete-atlas-input {
+    outline: 0;
+    width: 100%;
+    border: 0;
+    margin: 0;
+    padding: 0;
+  }
+  
+  .autocomplete-atlas {
+    display: flex;
+    flex-direction: row;
+  }
+  
+  .autocomplete-atlas-prompt {
+    display: inline-block;
+  }
+  
+  .autocomplete-atlas-prompt:not(:empty) {
+    margin-right: 1em;
+  }
+  
+  .autocomplete-atlas-hint {
+    position: absolute;
+    top: 0;
+    left: 0;
+    border-color: transparent;
+    background-color: #fff;
+    box-shadow: none;
+    color: #aaa;
+  }
+  
+  .autocomplete-atlas-dropdown-wrapper {
+    display: inline-block;
+    position: relative;
+    border: 0;
+    margin: 0;
+    padding: 0;
+    flex: 1;
+  }
+  
+  .autocomplete-atlas-input {
+    position: relative;
+    top: 0;
+    left: 0;
+    /* vertical-align: top; */
+    color: #333;
+    background-color: transparent;
+  }
+  
+  .autocomplete-atlas-input-wrapper {
+    display: flex;
+    position: relative;
+    outline: 0px;
+    border: 0;
+    margin: 0px;
+    padding: 0px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    top: 0;
+    margin-left: 5px;
+  }
+  
+  .autocomplete-atlas-dropdown {
+    position: absolute;
+    display: none;
+    outline: 0;
+    margin: 0;
+    padding: 0;
+    text-align: left;
+    cursor: default;
+    border-style: solid;
+    border-width: 1px;
+    border-color: #aaa;
+    overflow-y: scroll;
+    overflow-x: scroll;
+    white-space: pre;
+    background-color: white;
+    color: #000;
+    margin-left: 5px;
+  }
+  
+  
+  .autocomplete-atlas-completion {
+    text-align: right;
+    display: inline;
+    flex: 1;
+    font-style: italic;
+    /*padding-left: 2em; */
+  }
+  
+  .autocomplete-atlas-completion:hover {
+    outline: 1px solid #ddd;
+  }
+  
+  .autocomplete-atlas-completion-active {
+    background-color: #ccc;
+  }
+  
+  .autocomplete-atlas-completion-with-description {
+    display: flex;
+    flex-direction: row;
+  }
+  
+  .autocomplete-atlas-completion-description {
+    text-align: right;
+    display: inline;
+    flex: 1;
+    font-style: italic;
+    padding-left: 2em;
+  }
+  
