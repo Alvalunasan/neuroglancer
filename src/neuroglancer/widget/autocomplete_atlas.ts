@@ -595,20 +595,34 @@ export class AutocompleteTextInputAtlas extends RefCounted {
 
     positionDropdown(element: HTMLElement, dropdownElement: HTMLElement) {
 
-      let distanceToTop = element.parentElement!.offsetTop;
-      let distanceToTop2 = element.parentElement!.parentElement!.offsetTop;
-      let distanceToTopnew = distanceToTop - distanceToTop2
-      let heightbox = element.parentElement!.parentElement!.offsetHeight;
-      let distanceToBottom = heightbox - distanceToTopnew - element.offsetHeight;
-      
+      let tabElement = element;
+      let classListTab = element.classList;
+      let leftMargin = 15;
+      let bottomMargin = 20;
+      for (let i = 0; i < 4; i++)
+      {
+      tabElement = tabElement.parentElement!;
+      classListTab = tabElement.classList;
+      console.log(classListTab);
+      if (classListTab.contains("neuroglancer-tab-content")) {
+        break;
+      }
+      }
+
+      let heightTab = tabElement.offsetHeight
+      let distanceToTopTab = tabElement.offsetTop;
+      let distanceToTopBar = element.offsetTop;
+      let distanceToBottom = heightTab - (distanceToTopBar - distanceToTopTab);
+      distanceToBottom -= bottomMargin;
+
       dropdownElement.style.top = '100%';
       dropdownElement.style.bottom = '';
       dropdownElement.style.maxHeight = distanceToBottom+'px';
 
-      let widthnow = element.parentElement!.parentElement!.offsetWidth;
-      let leftMargin = 15;
+      let widthnow = tabElement.offsetWidth;
       widthnow -= leftMargin;
       dropdownElement.style.maxWidth = widthnow + 'px';
+      dropdownElement.style.minWidth = widthnow + 'px';
          
     }
 

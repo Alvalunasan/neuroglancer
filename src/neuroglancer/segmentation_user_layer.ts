@@ -935,9 +935,10 @@ class DisplayOptionsTab extends Tab {
     maybeAddSkeletonShaderUI();
     maybeAddOmniSegmentWidget();
 
+    element.appendChild(groupSegmentSelection.element);
     element.appendChild(group2D.element);
     element.appendChild(group3D.element);
-    element.appendChild(groupSegmentSelection.element);
+
     element.appendChild(groupOmniInfo.element);
 
     this.visibility.changed.add(() => {
