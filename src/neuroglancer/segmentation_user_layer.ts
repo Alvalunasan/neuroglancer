@@ -53,6 +53,8 @@ import {SegmentSetWidget} from 'neuroglancer/widget/segment_set_widget';
 import {ShaderCodeWidget} from 'neuroglancer/widget/shader_code_widget';
 import {Tab} from 'neuroglancer/widget/tab_view';
 import {Uint64EntryWidget} from 'neuroglancer/widget/uint64_entry_widget';
+import {makeDefaultCompletionElement} from 'neuroglancer/widget/autocomplete';
+import {AutocompleteTextInputAtlas, DataAtlasProvider} from 'neuroglancer/widget/autocomplete_atlas';
 import {PickState} from 'neuroglancer/layer';
 import {AraAtlas} from 'neuroglancer/ui/ara_atlas';
 import {PmaAtlas} from 'neuroglancer/ui/pma_atlas';
@@ -750,6 +752,8 @@ class DisplayOptionsTab extends Tab {
   private groupOmniInfo = this.registerDisposer(new MinimizableGroupWidget('Omni Segment Info'));
   visibleSegmentWidget = this.registerDisposer(new SegmentSetWidget(this.layer.displayState));
   addSegmentWidget = this.registerDisposer(new Uint64EntryWidget());
+  atlasProvider = this.registerDisposer(new DataAtlasProvider());
+  segmentInput: AutocompleteTextInputAtlas;
   selectedAlphaWidget =
       this.registerDisposer(new RangeWidget(this.layer.displayState.selectedAlpha));
   notSelectedAlphaWidget =
@@ -828,6 +832,61 @@ class DisplayOptionsTab extends Tab {
     }
 
     {
+      const label = document.createElement('label');
+      label.className =
+          'neuroglancer-segmentation-dropdown-ignore-segment-interactions neuroglancer-noselect';
+      label.appendChild(document.createTextNode('Select area to filter (text): '));
+      groupSegmentSelection.appendFixedChild(label);
+    }
+
+    if (this.layer.atlas != null) {
+      this.atlasProvider.register(this.layer.atlas.ara_id)
+    }
+
+    let regionCompleter = (value: string) =>
+    this.atlasProvider
+        .regionCompleter(value)
+        .then(originalResult => ({
+                completions: originalResult.completions,
+                makeElement: makeDefaultCompletionElement,
+                offset: originalResult.offset,
+                showSingleResult: true,
+              }));
+
+    let segmentInput = this.segmentInput =
+      this.registerDisposer(new AutocompleteTextInputAtlas({completer: regionCompleter, delay: 0}));
+      segmentInput.element.classList.add('add-segment');
+
+     this.segmentInput.element.title = 'Add one or more segment IDs';
+     this.segmentInput.registerAtlasProvider(this.atlasProvider);
+
+     groupSegmentSelection.appendFixedChild(this.registerDisposer(this.segmentInput).element);
+
+     this.registerDisposer(this.segmentInput.valuesEntered.add((values: Uint64[]) => {
+      for (const value of values) {
+        this.layer.displayState.rootSegments.add(value);
+      }
+    }));
+
+    {
+      const label = document.createElement('label');
+      label.className =
+          'neuroglancer-segmentation-dropdown-ignore-segment-interactions neuroglancer-noselect';
+      label.appendChild(document.createTextNode('Select area to filter (numeric): '));
+      groupSegmentSelection.appendFixedChild(label);
+    }
+
+
+    this.addSegmentWidget.element.classList.add('add-segment');
+    this.addSegmentWidget.element.title = 'Add one or more segment IDs';
+    groupSegmentSelection.appendFixedChild(this.registerDisposer(this.addSegmentWidget).element);
+    this.registerDisposer(this.addSegmentWidget.valuesEntered.add((values: Uint64[]) => {
+      for (const value of values) {
+        this.layer.displayState.rootSegments.add(value);
+      }
+    }));
+
+    {
       const checkbox =
           this.registerDisposer(new TrackableBooleanCheckbox(layer.ignoreSegmentInteractions));
       checkbox.element.className =
@@ -853,14 +912,6 @@ class DisplayOptionsTab extends Tab {
       groupSegmentSelection.appendFixedChild(label);
     }
 
-    this.addSegmentWidget.element.classList.add('add-segment');
-    this.addSegmentWidget.element.title = 'Add one or more segment IDs';
-    groupSegmentSelection.appendFixedChild(this.registerDisposer(this.addSegmentWidget).element);
-    this.registerDisposer(this.addSegmentWidget.valuesEntered.add((values: Uint64[]) => {
-      for (const value of values) {
-        this.layer.displayState.rootSegments.add(value);
-      }
-    }));
     groupSegmentSelection.appendFlexibleChild(
         this.registerDisposer(this.visibleSegmentWidget).element);
 
@@ -944,9 +995,10 @@ class DisplayOptionsTab extends Tab {
     maybeAddSkeletonShaderUI();
     maybeAddOmniSegmentWidget();
 
+    element.appendChild(groupSegmentSelection.element);
     element.appendChild(group2D.element);
     element.appendChild(group3D.element);
-    element.appendChild(groupSegmentSelection.element);
+
     element.appendChild(groupOmniInfo.element);
 
     this.visibility.changed.add(() => {
