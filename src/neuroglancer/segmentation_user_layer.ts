@@ -306,7 +306,6 @@ export class SegmentationUserLayer extends Base {
           console.log("A custom atlas was provided!");
           this.atlas = new CustomAtlas();
         }
-  
         else if (volume.atlasType) {
           if (volume.atlasType == 'Allen') {
             this.atlas =  new AraAtlas();
@@ -318,7 +317,6 @@ export class SegmentationUserLayer extends Base {
             this.atlas = new MriAtlas();
             }
         }
-
 
         if (!this.wasDisposed) {
           const {displayState} = this;
@@ -368,8 +366,6 @@ export class SegmentationUserLayer extends Base {
             ++remaining;
 
             Promise.resolve(volume.getSegmentToVoxelCountMap()).then(segmentToVoxelCountMap => {
-              console.log(segmentToVoxelCountMap);
-
               if (this.wasDisposed) {
                 return;
               }
@@ -388,10 +384,8 @@ export class SegmentationUserLayer extends Base {
             ++remaining;
 
             Promise.resolve(volume.getCustomAtlasMap()).then(customAtlasMap => {
-              console.log(customAtlasMap);
               if (customAtlasMap) {
                   customAtlasMap.forEach((value: string, key: number) => {
-                    console.log(key,value);
                     if (this.atlas) {  
                       this.atlas.ara_id.set(key,value);
                     }
@@ -423,7 +417,6 @@ export class SegmentationUserLayer extends Base {
    if (this.atlas !== null) {
      let newvalue = super.getValueAt(position, pickState);
      if (newvalue !== null && newvalue !== undefined && (+newvalue !== +this.oldvalue)) {
-       // console.log('I got a new value! ' + newvalue + ' vs ' + this.oldvalue);
        if (! (typeof this.atlas === 'undefined' || this.atlas === null) && (this.ontfield != null)) {
                  this.ontfield.innerHTML = '' + this.atlas.getNameForId(+newvalue.toString());
        } 
@@ -559,9 +552,7 @@ export class SegmentationUserLayer extends Base {
           const ara_keys = this.atlas.ara_id.keys();
           for (let key of ara_keys) {
             const id_uint64 = new Uint64(key,0);
-            // console.log(id_uint64);
             this.displayState.rootSegments.add(id_uint64); 
-            // console.log(key);
           }
           StatusMessage.showTemporaryMessage(
             'All segments added!',
