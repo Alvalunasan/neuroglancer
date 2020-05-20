@@ -18,8 +18,10 @@ import {UserLayer} from 'neuroglancer/layer';
 import {LayerListSpecification, registerLayerType, registerVolumeLayerType} from 'neuroglancer/layer_specification';
 import {Overlay} from 'neuroglancer/overlay';
 import {VolumeType} from 'neuroglancer/sliceview/volume/base';
-import {FRAGMENT_MAIN_START, getTrackableFragmentMain, ImageRenderLayer} from 'neuroglancer/sliceview/volume/image_renderlayer';
+import {DEFAULT_IMAGE_CONTRAST,FRAGMENT_MAIN_START, getTrackableFragmentMain, ImageRenderLayer} from 'neuroglancer/sliceview/volume/image_renderlayer';
 import {trackableAlphaValue} from 'neuroglancer/trackable_alpha';
+import {trackableFiniteFloat} from 'neuroglancer/trackable_finite_float';
+import {TrackableBoolean} from 'neuroglancer/trackable_boolean';
 import {trackableBlendModeValue} from 'neuroglancer/trackable_blend';
 import {UserLayerWithVolumeSourceMixin} from 'neuroglancer/user_layer_with_volume_source';
 import {makeWatchableShaderError} from 'neuroglancer/webgl/dynamic_shader';
@@ -42,6 +44,8 @@ const SHADER_CONTROLS_JSON_KEY = 'shaderControls';
 
 const Base = UserLayerWithVolumeSourceMixin(UserLayer);
 export class ImageUserLayer extends Base {
+  colorContrast = trackableFiniteFloat(DEFAULT_IMAGE_CONTRAST)
+  colorInverted = new TrackableBoolean(false)
   opacity = trackableAlphaValue(0.5);
   blendMode = trackableBlendModeValue();
   fragmentMain = getTrackableFragmentMain();
@@ -52,7 +56,7 @@ export class ImageUserLayer extends Base {
     super(manager, x);
     this.registerDisposer(this.blendMode.changed.add(this.specificationChanged.dispatch));
     this.registerDisposer(this.fragmentMain.changed.add(this.specificationChanged.dispatch));
-    this.registerDisposer(this.shaderControlState.changed.add(this.specificationChanged.dispatch));
+    this.registerDisposer(this.shaderControlState.changed.add(this.specificationChanged.dispatch));  
     this.tabs.add(
         'rendering',
         {label: 'Rendering', order: -100, getter: () => new RenderingOptionsTab(this)});
@@ -98,6 +102,63 @@ export class ImageUserLayer extends Base {
     x[SHADER_CONTROLS_JSON_KEY] = this.shaderControlState.toJSON();
     return x;
   }
+
+  handleAction(action: string) {
+
+    switch (action) {
+
+      case 'invert-colormap': {
+        if (this.colorInverted.value) {
+          console.log("Colormap is already inverted");
+          console.log("...reverting");
+          // keep current contrast level and revert to toNormalized()
+          const fragmentStr = "void main() {emitGrayscale(toNormalized(getDataValue())*"+this.colorContrast.value.toFixed(1)+");}";  
+          this.fragmentMain.value = fragmentStr;
+          // now set the colorInverted property to false to reflect updated state
+          this.colorInverted.value = false;
+        }
+        else {
+          console.log("Colormap is not inverted");
+          console.log("...inverting");
+          // keep current contrast level, but invert via 1.0-toNormalized() 
+          const fragmentStr = "void main() {emitGrayscale(1.0-toNormalized(getDataValue())*"+this.colorContrast.value.toFixed(1)+");}";  
+          this.fragmentMain.value = fragmentStr;
+          // now set the colorInverted property to true to reflect updated state 
+          this.colorInverted.value = true;
+        }
+        break;
+      }
+
+      case 'increase-contrast': {
+        this.colorContrast.value += 5.0;
+        // Figure out if inverted or not
+        var fragmentStr = "void main() {emitGrayscale"
+        if (this.colorInverted.value) {
+          fragmentStr += "(1.0-toNormalized(getDataValue())*"+this.colorContrast.value.toFixed(1)+");}";
+        }
+        else {
+          fragmentStr += "(toNormalized(getDataValue())*"+this.colorContrast.value.toFixed(1)+");}";
+        }
+        this.fragmentMain.value = fragmentStr;
+        break;
+      }
+
+      case 'decrease-contrast': {
+        this.colorContrast.value -= 5.0;
+        var fragmentStr = "void main() {emitGrayscale"
+        // Figure out if inverted or not
+        if (this.colorInverted.value) {
+          fragmentStr += "(1.0-toNormalized(getDataValue())*"+this.colorContrast.value.toFixed(1)+");}";
+        }
+        else {
+          fragmentStr += "(toNormalized(getDataValue())*"+this.colorContrast.value.toFixed(1)+");}";
+        }
+        this.fragmentMain.value = fragmentStr;
+        break;
+      }
+    }
+  }
+
 }
 
 function makeShaderCodeWidget(layer: ImageUserLayer) {

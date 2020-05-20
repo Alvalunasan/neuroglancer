@@ -25,9 +25,11 @@ import {ShaderBuilder} from 'neuroglancer/webgl/shader';
 import {addControlsToBuilder, setControlsInShader, ShaderControlState} from 'neuroglancer/webgl/shader_ui_controls';
 
 export const FRAGMENT_MAIN_START = '//NEUROGLANCER_IMAGE_RENDERLAYER_FRAGMENT_MAIN_START';
-
+export const DEFAULT_IMAGE_CONTRAST = 15.0;
+console.log("DEFAULT_IMAGE_CONTRAST:");
+console.log(DEFAULT_IMAGE_CONTRAST);
 const DEFAULT_FRAGMENT_MAIN = `void main() {
-  emitGrayscale(toNormalized(getDataValue()));
+  emitGrayscale(toNormalized(getDataValue())*${DEFAULT_IMAGE_CONTRAST.toFixed(1)});
 }
 `;
 

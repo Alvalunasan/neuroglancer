@@ -29,6 +29,9 @@ export function getDefaultGlobalBindings() {
     map.set('shift+keyb', 'toggle-default-annotations');
     map.set('keya', 'toggle-axis-lines');
     map.set('keyg', 'select-all-segments');
+    map.set('keyi', 'invert-colormap');
+    map.set('keyf', 'increase-contrast');
+    map.set('keyd', 'decrease-contrast');
     map.set('keyo', 'toggle-orthographic-projection');
     map.set('control+shift+keys', 'save-state');
     map.set('control+shift+keyj', 'save-state-getjson');
