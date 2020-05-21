@@ -647,7 +647,7 @@ export class Viewer extends RefCounted implements ViewerState {
     for (const action
              of ['recolor', 'clear-segments', 'merge-selected', 'cut-selected',
                  'shatter-segment-equivalences','select-all-segments','change-opacity',
-                 'update-shader','increase-contrast','decrease-contrast',
+                 'update-shader','increase-brightness','decrease-brightness',
                  'invert-colormap']) {
       this.bindAction(action, () => {
         this.layerManager.invokeAction(action);

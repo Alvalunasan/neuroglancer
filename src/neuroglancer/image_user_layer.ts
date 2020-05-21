@@ -129,7 +129,7 @@ export class ImageUserLayer extends Base {
         break;
       }
 
-      case 'increase-contrast': {
+      case 'increase-brightness': {
         this.colorContrast.value += 5.0;
         // Figure out if inverted or not
         var fragmentStr = "void main() {emitGrayscale"
@@ -143,7 +143,7 @@ export class ImageUserLayer extends Base {
         break;
       }
 
-      case 'decrease-contrast': {
+      case 'decrease-brightness': {
         this.colorContrast.value -= 5.0;
         var fragmentStr = "void main() {emitGrayscale"
         // Figure out if inverted or not
