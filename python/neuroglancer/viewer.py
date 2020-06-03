@@ -39,6 +39,7 @@ class _ViewerHelper(object):
 
 class Viewer(viewer_base.ViewerBase, _ViewerHelper):
     def __init__(self):
+        print("Made a new viewer!")
         super(Viewer, self).__init__()
         server.register_viewer(self)
 
