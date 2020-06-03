@@ -23,6 +23,7 @@ import numpy as np
 import six
 
 from . import local_volume
+from . import segment_colors
 from .equivalence_map import EquivalenceMap
 from .json_utils import encode_json_for_repr
 from .json_wrappers import (JsonObjectWrapper, array_wrapper, optional, text_type, typed_list,
@@ -226,6 +227,20 @@ class SegmentationLayerBase(Layer, _AnnotationLayerOptions):
         'crossSectionRenderScale', optional(float, 1))
     mesh_render_scale = meshRenderScale = wrapped_property('meshRenderScale', optional(float, 10))
 
+    @property
+    def segment_html_color_dict(self):
+        """ Returns a dictionary whose keys 
+        are segments and values are the 6-digit hex strings
+        representing the colors of those segments
+        given the current color seed """
+        d = {}
+        for segment in self.segments:
+            hex_string = segment_colors.hex_string_from_segment_id(
+                color_seed=self.color_seed,segment_id=segment)
+            d[segment] = hex_string
+            
+        return d
+        
     @staticmethod
     def interpolate(a, b, t):
         c = copy.deepcopy(a)
