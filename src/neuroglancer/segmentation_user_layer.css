@@ -22,6 +22,7 @@
 .segmentation-dropdown {
   display: flex;
   flex-direction: column;
+  max-height: 99%;
 }
 
 .segmentation-dropdown .add-segment {

@@ -603,10 +603,16 @@ export class AutocompleteTextInputAtlas extends RefCounted {
       {
       tabElement = tabElement.parentElement!;
       classListTab = tabElement.classList;
-      console.log(classListTab);
       if (classListTab.contains("neuroglancer-tab-content")) {
         break;
       }
+      }
+
+      // If tab has scroll bar
+      if (tabElement.scrollHeight > tabElement.clientHeight)
+      {
+        leftMargin *= 2;
+        bottomMargin *= 2;
       }
 
       let heightTab = tabElement.offsetHeight
